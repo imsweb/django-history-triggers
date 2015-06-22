@@ -4,6 +4,7 @@ Middleware that creates a temporary table for a connection and puts the current 
 
 from django.db import connections
 from django.conf import settings
+from django.core.exceptions import MiddlewareNotUsed
 
 def temp_table_exists(c, name):
     c.execute("""
@@ -29,6 +30,11 @@ def create_history_table(user_id):
     c.execute("INSERT INTO %(table)s (%(field)s) VALUES (%%s)" % params, (user_id,))
 
 class HistoryMiddleware (object):
+
+    def __init__(self):
+        if 'postgresql' not in settings.DATABASES['default']['ENGINE']:
+            raise MiddlewareNotUsed()
+
     def process_request(self, request):
         request_user_field = getattr(settings, 'HISTORY_REQUEST_USER_FIELD', 'user')
         assert hasattr(request, request_user_field), "HistoryMiddleware expected to find request.%s" % request_user_field
