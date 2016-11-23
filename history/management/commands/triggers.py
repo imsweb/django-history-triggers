@@ -2,6 +2,8 @@ from django.core.management.base import BaseCommand
 from django.db import connections, transaction
 from django.conf import settings
 from optparse import make_option
+from django.utils.encoding import force_bytes
+import hashlib
 
 HISTORY_SCHEMA_NAME = getattr(settings, 'HISTORY_SCHEMA', 'history')
 HISTORY_USER_TEMP_TABLE = getattr(settings, 'HISTORY_USER_TEMP_TABLE', 'history_user')
@@ -21,6 +23,13 @@ IGNORED_COLUMNS = getattr(settings, 'HISTORY_IGNORED_COLUMNS', [])
 # Controls the column type for the date_modified field on history tables.
 USE_TIMEZONES = getattr(settings, 'HISTORY_USE_TIMEZONES', True)
 
+def truncate_long_name(name):
+    # This is copied from django to shorten names that would exceed postgres's limit of 63 characters
+    # Originally found in django/db/backends/utils.py in "truncate_name"
+    # Django source code: https://github.com/django/django/blob/stable/1.5.x/django/db/backends/util.py#L133
+    hsh = hashlib.md5(force_bytes(name)).hexdigest()[:5]        
+    return '%s_%s' % (name[:57], hsh) if len(name) > 63 else name
+
 class Command (BaseCommand):
     option_list = BaseCommand.option_list + (
         make_option('--drop',
@@ -37,15 +46,18 @@ class Command (BaseCommand):
         if not dropping:
             create_history_schema(cursor)
         table_names = get_base_tables(cursor)
+        action_verb = 'Dropping' if dropping else 'Creating'
         for table_name in sorted(table_names):
             pk_name, pk_type = table_names[table_name]
             if not dropping and create_history_table(cursor, table_name, pk_name, pk_type):
                 print 'Created history table for %s (pk=%s)' % (table_name, pk_name)
+            print "%s triggers for: %s" % (action_verb, table_name)
             for trigger_type in ('insert', 'update', 'delete'):
                 if dropping:
                     drop_trigger(cursor, trigger_type, table_name)
                 else:
                     create_trigger(cursor, trigger_type, table_name, pk_name)
+        print "%s triggers is complete. No errors were raised." % (action_verb)
 
 def schema_exists(cursor, schema_name):
     """
@@ -151,7 +163,7 @@ def create_history_table(cursor, base_table, pk_name, pk_type):
     """
     Builds the history table (if it doesn't already exist) given the base table name.
     """
-    history_table = base_table + '_history'
+    history_table = truncate_long_name(base_table + '_history')
     if not table_exists(cursor, history_table, HISTORY_SCHEMA_NAME):
         params = {
             'schema': HISTORY_SCHEMA_NAME,
@@ -179,9 +191,10 @@ def create_history_table(cursor, base_table, pk_name, pk_type):
     return False
 
 def get_field_history_sql(trigger_type, table_name, field_name, field_type, pk_name):
+    history_table_name = truncate_long_name(table_name + "_history")
     params = {
         'field': field_name,
-        'history_table': '%s.%s_history' % (HISTORY_SCHEMA_NAME, table_name),
+        'history_table': '%s.%s' % (HISTORY_SCHEMA_NAME, history_table_name),
         'pk_name': pk_name,
     }
     if trigger_type == 'insert':
@@ -220,8 +233,9 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='publ
         sql = get_field_history_sql(trigger_type, table_name, field_name, field_type, pk_name)
         body_sql.append(sql)
     trigger_name = "trig_%s_%s" % (table_name, trigger_type)
+    fx_name = truncate_long_name(trigger_name)
     params = {
-        'fx_name': trigger_name,
+        'fx_name': fx_name,
         'body': ''.join(body_sql),
         'history_user_table': HISTORY_USER_TEMP_TABLE,
         'history_user_field': HISTORY_USER_FIELD,
@@ -249,25 +263,31 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='publ
         REVOKE ALL ON FUNCTION %(fx_name)s() FROM public;
     """ % params)
     # Now create the actual trigger.
+    calling_fx_long = 'tr_%s_%s' % (table_name, trigger_type)
+    calling_fx = truncate_long_name(calling_fx_long)
     params = {
-        'calling_fx': 'tr_%s_%s' % (table_name, trigger_type),
+        'calling_fx': calling_fx,
         'when': 'AFTER' if trigger_type == 'delete' else 'BEFORE',
         'trans_type': trigger_type.upper(),
         'table': table_name,
-        'trigger_fx': trigger_name,
+        'fx_name': fx_name,
     }
     cursor.execute("""
         DROP TRIGGER IF EXISTS %(calling_fx)s ON "%(table)s";
         CREATE TRIGGER %(calling_fx)s
             %(when)s %(trans_type)s ON "%(table)s"
-            FOR EACH ROW EXECUTE PROCEDURE %(trigger_fx)s();
+            FOR EACH ROW EXECUTE PROCEDURE %(fx_name)s();
     """ % params)
 
 def drop_trigger(cursor, trigger_type, table_name, table_schema='public'):
+    calling_fx_long = 'tr_%s_%s' % (table_name, trigger_type)
+    calling_fx = truncate_long_name(calling_fx_long)
     cursor.execute('DROP TRIGGER IF EXISTS %(calling_fx)s ON "%(table)s";' % {
-        'calling_fx': 'tr_%s_%s' % (table_name, trigger_type),
+        'calling_fx': calling_fx,
         'table': table_name,
     })
+    fx_name_long = 'trig_%s_%s' % (table_name, trigger_type)
+    fx_name = truncate_long_name(fx_name_long)
     cursor.execute('DROP FUNCTION IF EXISTS %(fx_name)s();' % {
-        'fx_name': 'trig_%s_%s' % (table_name, trigger_type),
+        'fx_name': fx_name,
     })
