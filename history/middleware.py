@@ -31,10 +31,21 @@ def create_history_table(user_id):
 
 class HistoryMiddleware (object):
 
-    def __init__(self):
+    def __init__(self, get_response=None):
         if 'postgresql' not in settings.DATABASES['default']['ENGINE']:
             raise MiddlewareNotUsed()
+        self.get_response = get_response
 
+    def __call__(self, request):
+        response = None
+        if hasattr(self, 'process_request'):
+            response = self.process_request(request)
+        if not response:
+            response = self.get_response(request)
+        if hasattr(self, 'process_response'):
+            response = self.process_response(request, response)
+        return response
+            
     def process_request(self, request):
         request_user_field = getattr(settings, 'HISTORY_REQUEST_USER_FIELD', 'user')
         assert hasattr(request, request_user_field), "HistoryMiddleware expected to find request.%s" % request_user_field
@@ -42,3 +53,4 @@ class HistoryMiddleware (object):
         static_files_url = settings.STATIC_URL if getattr(settings, 'STATIC_URL', None) else getattr(settings, 'MEDIA_URL', None)
         if user and hasattr(user, 'pk') and user.pk and not request.path.startswith(static_files_url):
             create_history_table(user.pk)
+
