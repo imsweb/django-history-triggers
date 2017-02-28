@@ -8,6 +8,7 @@ import hashlib
 HISTORY_SCHEMA_NAME = getattr(settings, 'HISTORY_SCHEMA', 'history')
 HISTORY_USER_TEMP_TABLE = getattr(settings, 'HISTORY_USER_TEMP_TABLE', 'history_user')
 HISTORY_USER_FIELD = getattr(settings, 'HISTORY_USER_FIELD', 'user_id')
+HISTORY_DEFAULT_USER_ERROR = getattr(settings, 'HISTORY_DEFAULT_USER_ERROR', 'False')
 
 # The database role that should own the history tables and triggers.
 DB_ROLE = getattr(settings, 'HISTORY_DB_ROLE', settings.DATABASES['default']['USER'])
@@ -241,7 +242,8 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='publ
         'history_user_field': HISTORY_USER_FIELD,
         'return': 'OLD' if trigger_type == 'delete' else 'NEW',
         'role': DB_ROLE,
-        'timestamp_type': 'timestamp with time zone' if USE_TIMEZONES else 'timestamp'
+        'timestamp_type': 'timestamp with time zone' if USE_TIMEZONES else 'timestamp',
+        'default_user_error': HISTORY_DEFAULT_USER_ERROR
     }
     cursor.execute("""
         CREATE OR REPLACE FUNCTION %(fx_name)s() RETURNS trigger AS $BODY$
@@ -253,6 +255,8 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='publ
                 EXECUTE 'select exists (select 1 from information_schema.tables where table_name = ''%(history_user_table)s'')' INTO _exists;
                 IF _exists THEN
                     EXECUTE 'select %(history_user_field)s from %(history_user_table)s' INTO _user_id;
+                ELSIF %(default_user_error)s THEN
+                    RAISE EXCEPTION '%(history_user_table)s does not exist.';
                 END IF;
                 %(body)s
                 RETURN %(return)s;
