@@ -1,14 +1,18 @@
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import connections, transaction
-from django.conf import settings
-from optparse import make_option
+from django.utils import six
 from django.utils.encoding import force_bytes
+
 import hashlib
+
 
 HISTORY_SCHEMA_NAME = getattr(settings, 'HISTORY_SCHEMA', 'history')
 HISTORY_USER_TEMP_TABLE = getattr(settings, 'HISTORY_USER_TEMP_TABLE', 'history_user')
 HISTORY_USER_FIELD = getattr(settings, 'HISTORY_USER_FIELD', 'user_id')
-HISTORY_DEFAULT_USER_ERROR = getattr(settings, 'HISTORY_DEFAULT_USER_ERROR', 'False')
+HISTORY_USER_TYPE = getattr(settings, 'HISTORY_USER_TYPE', 'integer')
+HISTORY_DEFAULT_USER = getattr(settings, 'HISTORY_DEFAULT_USER', 0)
+HISTORY_DEFAULT_USER_ERROR = getattr(settings, 'HISTORY_DEFAULT_USER_ERROR', False)
 
 # The database role that should own the history tables and triggers.
 DB_ROLE = getattr(settings, 'HISTORY_DB_ROLE', settings.DATABASES['default']['USER'])
@@ -24,20 +28,35 @@ IGNORED_COLUMNS = getattr(settings, 'HISTORY_IGNORED_COLUMNS', [])
 # Controls the column type for the date_modified field on history tables.
 USE_TIMEZONES = getattr(settings, 'HISTORY_USE_TIMEZONES', True)
 
+
 def truncate_long_name(name):
     # This is copied from django to shorten names that would exceed postgres's limit of 63 characters
     # Originally found in django/db/backends/utils.py in "truncate_name"
     # Django source code: https://github.com/django/django/blob/stable/1.5.x/django/db/backends/util.py#L133
-    hsh = hashlib.md5(force_bytes(name)).hexdigest()[:5]        
+    hsh = hashlib.md5(force_bytes(name)).hexdigest()[:5]
     return '%s_%s' % (name[:57], hsh) if len(name) > 63 else name
 
+
+def maybe_quote(value):
+    """
+    Used for quoting the HISTORY_DEFAULT_USER value, if it's a string.
+    """
+    if value is None:
+        return 'NULL'
+    elif isinstance(value, six.string_types):
+        return "'%s'" % value.replace("'", "''")
+    return value
+
+
 class Command (BaseCommand):
-    option_list = BaseCommand.option_list + (
-        make_option('--drop',
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--drop',
             action='store_true',
             dest='drop',
             default=False,
-            help='Drop triggers instead of creating them'),
+            help='Drop triggers instead of creating them'
         )
 
     @transaction.atomic
@@ -51,14 +70,15 @@ class Command (BaseCommand):
         for table_name in sorted(table_names):
             pk_name, pk_type = table_names[table_name]
             if not dropping and create_history_table(cursor, table_name, pk_name, pk_type):
-                print 'Created history table for %s (pk=%s)' % (table_name, pk_name)
-            print "%s triggers for: %s" % (action_verb, table_name)
+                print('Created history table for %s (pk=%s)' % (table_name, pk_name))
+            print('%s triggers for: %s' % (action_verb, table_name))
             for trigger_type in ('insert', 'update', 'delete'):
                 if dropping:
                     drop_trigger(cursor, trigger_type, table_name)
                 else:
                     create_trigger(cursor, trigger_type, table_name, pk_name)
-        print "%s triggers is complete. No errors were raised." % (action_verb)
+        print('%s triggers is complete. No errors were raised.' % action_verb)
+
 
 def schema_exists(cursor, schema_name):
     """
@@ -69,6 +89,7 @@ def schema_exists(cursor, schema_name):
     """, (schema_name,))
     return cursor.fetchone()[0]
 
+
 def table_exists(cursor, table_name, schema_name='public'):
     """
     Returns whether or not a table exists in the DB given the table and schema name (default 'public').
@@ -78,6 +99,7 @@ def table_exists(cursor, table_name, schema_name='public'):
     """, (table_name, schema_name))
     return cursor.fetchone()[0]
 
+
 def trigger_exists(cursor, trigger_name, schema_name='public'):
     """
     Returns whether or not the trigger function exists in the DB.
@@ -86,6 +108,7 @@ def trigger_exists(cursor, trigger_name, schema_name='public'):
         SELECT EXISTS (SELECT 1 FROM information_schema.triggers WHERE trigger_schema = %s AND trigger_name = %s)
     """, (schema_name, trigger_name))
     return cursor.fetchone()[0]
+
 
 def get_base_tables(cursor, schema_name='public'):
     """
@@ -121,6 +144,7 @@ def get_base_tables(cursor, schema_name='public'):
             table_names[row[0]] = (row[1], pk_type)
     return table_names
 
+
 def get_table_columns(cursor, table_name, schema_name='public'):
     """
     Returns a list of columns for the given table but excludes text and binary columns
@@ -148,17 +172,22 @@ def get_table_columns(cursor, table_name, schema_name='public'):
             continue
         yield row[0], row[1]
 
+
 def create_history_schema(cursor):
     """
     Create the history schema if it doesn't already exist.
     """
     if not schema_exists(cursor, HISTORY_SCHEMA_NAME):
-        params = {'name': HISTORY_SCHEMA_NAME, 'role': DB_ROLE}
+        params = {
+            'name': HISTORY_SCHEMA_NAME,
+            'role': DB_ROLE,
+        }
         cursor.execute("""
             CREATE SCHEMA %(name)s AUTHORIZATION %(role)s;
             GRANT ALL ON SCHEMA %(name)s TO %(role)s;
             REVOKE ALL ON SCHEMA %(name)s FROM public;
         """ % params)
+
 
 def create_history_table(cursor, base_table, pk_name, pk_type):
     """
@@ -173,6 +202,8 @@ def create_history_table(cursor, base_table, pk_name, pk_type):
             'timestamp_type': 'timestamp with time zone' if USE_TIMEZONES else 'timestamp',
             'pk_name': pk_name,
             'pk_type': pk_type,
+            'user_field': HISTORY_USER_FIELD,
+            'user_type': HISTORY_USER_TYPE,
         }
         cursor.execute("""
             CREATE TABLE %(schema)s.%(table)s (
@@ -181,7 +212,7 @@ def create_history_table(cursor, base_table, pk_name, pk_type):
                 old_value text,
                 new_value text,
                 date_modified %(timestamp_type)s not null,
-                user_id integer,
+                %(user_field)s %(user_type)s,
                 transaction_type char(1) not null
             );
             ALTER TABLE %(schema)s.%(table)s OWNER TO %(role)s;
@@ -191,35 +222,38 @@ def create_history_table(cursor, base_table, pk_name, pk_type):
         return True
     return False
 
+
 def get_field_history_sql(trigger_type, table_name, field_name, field_type, pk_name):
     history_table_name = truncate_long_name(table_name + "_history")
     params = {
         'field': field_name,
         'history_table': '%s.%s' % (HISTORY_SCHEMA_NAME, history_table_name),
         'pk_name': pk_name,
+        'user_field': HISTORY_USER_FIELD,
     }
     if trigger_type == 'insert':
         return """
                 -- %(field)s
-                INSERT INTO %(history_table)s (%(pk_name)s, field_name, old_value, new_value, date_modified, user_id, transaction_type)
+                INSERT INTO %(history_table)s (%(pk_name)s, field_name, old_value, new_value, date_modified, %(user_field)s, transaction_type)
                 VALUES (NEW.%(pk_name)s, '%(field)s', NULL, NEW."%(field)s", _dlm, _user_id, '+');
         """ % params
     elif trigger_type == 'delete':
         return """
                 -- %(field)s
-                INSERT INTO %(history_table)s (%(pk_name)s, field_name, old_value, new_value, date_modified, user_id, transaction_type)
+                INSERT INTO %(history_table)s (%(pk_name)s, field_name, old_value, new_value, date_modified, %(user_field)s, transaction_type)
                 VALUES (OLD.%(pk_name)s, '%(field)s', OLD."%(field)s", NULL, _dlm, _user_id, '-');
         """ % params
     elif trigger_type == 'update':
         return """
                 -- %(field)s
                 IF (OLD."%(field)s" IS DISTINCT FROM NEW."%(field)s") THEN
-                    INSERT INTO %(history_table)s (%(pk_name)s, field_name, old_value, new_value, date_modified, user_id, transaction_type)
+                    INSERT INTO %(history_table)s (%(pk_name)s, field_name, old_value, new_value, date_modified, %(user_field)s, transaction_type)
                     VALUES (OLD.%(pk_name)s, '%(field)s', OLD."%(field)s", NEW."%(field)s", _dlm, _user_id, '~');
                 END IF;
         """ % params
     else:
         raise ValueError('Invalid trigger type: "%s"' % trigger_type)
+
 
 def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='public'):
     """
@@ -243,13 +277,15 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='publ
         'return': 'OLD' if trigger_type == 'delete' else 'NEW',
         'role': DB_ROLE,
         'timestamp_type': 'timestamp with time zone' if USE_TIMEZONES else 'timestamp',
-        'default_user_error': HISTORY_DEFAULT_USER_ERROR
+        'user_type': HISTORY_USER_TYPE,
+        'default_user': maybe_quote(HISTORY_DEFAULT_USER),
+        'default_user_error': 'true' if HISTORY_DEFAULT_USER_ERROR else 'false',
     }
     cursor.execute("""
         CREATE OR REPLACE FUNCTION %(fx_name)s() RETURNS trigger AS $BODY$
             DECLARE
                 _dlm %(timestamp_type)s := now();
-                _user_id integer := 0;
+                _user_id %(user_type)s := %(default_user)s;
                 _exists boolean;
             BEGIN
                 EXECUTE 'select exists (select 1 from information_schema.tables where table_name = ''%(history_user_table)s'')' INTO _exists;
@@ -282,6 +318,7 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='publ
             %(when)s %(trans_type)s ON "%(table)s"
             FOR EACH ROW EXECUTE PROCEDURE %(fx_name)s();
     """ % params)
+
 
 def drop_trigger(cursor, trigger_type, table_name, table_schema='public'):
     calling_fx_long = 'tr_%s_%s' % (table_name, trigger_type)
