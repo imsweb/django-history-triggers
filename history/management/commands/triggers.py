@@ -28,6 +28,9 @@ IGNORED_COLUMNS = getattr(settings, 'HISTORY_IGNORED_COLUMNS', [])
 # Controls the column type for the date_modified field on history tables.
 USE_TIMEZONES = getattr(settings, 'HISTORY_USE_TIMEZONES', True)
 
+# If set to True, old_value/new_value will be JSON records instead of tracking individual field updates.
+USE_JSON = getattr(settings, 'HISTORY_JSON', False)
+
 
 def truncate_long_name(name):
     # This is copied from django to shorten names that would exceed postgres's limit of 63 characters
@@ -58,6 +61,13 @@ class Command (BaseCommand):
             default=False,
             help='Drop triggers instead of creating them'
         )
+        parser.add_argument(
+            '--clear',
+            action='store_true',
+            dest='clear',
+            default=False,
+            help='Drop the history schema in addition to triggers'
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -71,13 +81,16 @@ class Command (BaseCommand):
             pk_name, pk_type = table_names[table_name]
             if not dropping and create_history_table(cursor, table_name, pk_name, pk_type):
                 print('Created history table for %s (pk=%s)' % (table_name, pk_name))
-            print('%s triggers for: %s' % (action_verb, table_name))
+            print('%s triggers for %s' % (action_verb, table_name))
             for trigger_type in ('insert', 'update', 'delete'):
                 if dropping:
                     drop_trigger(cursor, trigger_type, table_name)
                 else:
                     create_trigger(cursor, trigger_type, table_name, pk_name)
         print('%s triggers is complete. No errors were raised.' % action_verb)
+        if options['clear']:
+            print('Dropping schema "%s"' % HISTORY_SCHEMA_NAME)
+            cursor.execute("DROP SCHEMA IF EXISTS %s CASCADE" % HISTORY_SCHEMA_NAME)
 
 
 def schema_exists(cursor, schema_name):
@@ -204,13 +217,15 @@ def create_history_table(cursor, base_table, pk_name, pk_type):
             'pk_type': pk_type,
             'user_field': HISTORY_USER_FIELD,
             'user_type': HISTORY_USER_TYPE,
+            'field_column': '' if USE_JSON else 'field_name varchar(64) not null,',
+            'value_type': 'jsonb' if USE_JSON else 'text',
         }
         cursor.execute("""
             CREATE TABLE %(schema)s.%(table)s (
                 %(pk_name)s %(pk_type)s not null,
-                field_name varchar(64) not null,
-                old_value text,
-                new_value text,
+                %(field_column)s
+                old_value %(value_type)s,
+                new_value %(value_type)s,
                 date_modified %(timestamp_type)s not null,
                 %(user_field)s %(user_type)s,
                 transaction_type char(1) not null
@@ -255,6 +270,32 @@ def get_field_history_sql(trigger_type, table_name, field_name, field_type, pk_n
         raise ValueError('Invalid trigger type: "%s"' % trigger_type)
 
 
+def get_json_history_sql(trigger_type, table_name, pk_name):
+    history_table_name = truncate_long_name(table_name + "_history")
+    params = {
+        'history_table': '%s.%s' % (HISTORY_SCHEMA_NAME, history_table_name),
+        'pk_name': pk_name,
+        'user_field': HISTORY_USER_FIELD,
+    }
+    if trigger_type == 'insert':
+        return """
+            INSERT INTO %(history_table)s (%(pk_name)s, old_value, new_value, date_modified, %(user_field)s, transaction_type)
+            VALUES (NEW.%(pk_name)s, NULL, row_to_json(NEW), _dlm, _user_id, '+');
+        """ % params
+    elif trigger_type == 'delete':
+        return """
+            INSERT INTO %(history_table)s (%(pk_name)s, old_value, new_value, date_modified, %(user_field)s, transaction_type)
+            VALUES (OLD.%(pk_name)s, row_to_json(OLD), NULL, _dlm, _user_id, '-');
+        """ % params
+    elif trigger_type == 'update':
+        return """
+            INSERT INTO %(history_table)s (%(pk_name)s, old_value, new_value, date_modified, %(user_field)s, transaction_type)
+            VALUES (OLD.%(pk_name)s, row_to_json(OLD), row_to_json(NEW), _dlm, _user_id, '~');
+        """ % params
+    else:
+        raise ValueError('Invalid trigger type: "%s"' % trigger_type)
+
+
 def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='public'):
     """
     Creates a history trigger of the specified type (update, insert, or delete) on the specified table.
@@ -264,9 +305,11 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='publ
         return
     # First, create the function that the trigger will call for each row.
     body_sql = []
-    for field_name, field_type in get_table_columns(cursor, table_name, table_schema):
-        sql = get_field_history_sql(trigger_type, table_name, field_name, field_type, pk_name)
-        body_sql.append(sql)
+    if USE_JSON:
+        body_sql.append(get_json_history_sql(trigger_type, table_name, pk_name))
+    else:
+        for field_name, field_type in get_table_columns(cursor, table_name, table_schema):
+            body_sql.append(get_field_history_sql(trigger_type, table_name, field_name, field_type, pk_name))
     trigger_name = "trig_%s_%s" % (table_name, trigger_type)
     fx_name = truncate_long_name(trigger_name)
     params = {
