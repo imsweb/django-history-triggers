@@ -39,4 +39,6 @@ class HistoryMiddleware (object):
         for prefix in ignore_paths:
             if request.path.startswith(prefix):
                 return
-        create_history_table(get_history_user_id(request))
+        user_id = get_history_user_id(request)
+        if user_id is not None:
+            create_history_table(user_id)
