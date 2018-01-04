@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import connections
+from django.db import models, connections
 
 
 def get_history_user_id(request):
@@ -23,3 +23,10 @@ def create_history_table(user_id):
     """ % params)
     c.execute("TRUNCATE %(table)s" % params)
     c.execute("INSERT INTO %(table)s (%(field)s) VALUES (%%s)" % params, (user_id,))
+
+
+def drop_history_table():
+    c = connections['default'].cursor()
+    c.execute("DROP TABLE IF EXISTS %(table)s" % {
+        'table': getattr(settings, 'HISTORY_USER_TEMP_TABLE', 'history_user'),
+    })
