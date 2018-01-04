@@ -1,19 +1,19 @@
 from django.conf import settings
-from django.db import models, connections
+from django.db import connections, models
+
+from . import conf
 
 
 def get_history_user_id(request):
-    request_user_field = getattr(settings, 'HISTORY_REQUEST_USER_FIELD', 'user')
-    user_attribute = getattr(settings, 'HISTORY_REQUEST_USER_ATTRIBUTE', 'pk')
-    user = getattr(request, request_user_field)
-    return getattr(user, user_attribute) if user_attribute else user
+    user = getattr(request, conf.REQUEST_USER_FIELD)
+    return getattr(user, conf.REQUEST_USER_ATTRIBUTE) if conf.REQUEST_USER_ATTRIBUTE else user
 
 
 def create_history_table(user_id):
     params = {
-        'table': getattr(settings, 'HISTORY_USER_TEMP_TABLE', 'history_user'),
-        'field': getattr(settings, 'HISTORY_USER_FIELD', 'user_id'),
-        'type': getattr(settings, 'HISTORY_USER_TYPE', 'integer'),
+        'table': conf.USER_TEMP_TABLE,
+        'field': conf.USER_FIELD,
+        'type': conf.USER_TYPE,
     }
     c = connections['default'].cursor()
     c.execute("""
@@ -28,5 +28,5 @@ def create_history_table(user_id):
 def drop_history_table():
     c = connections['default'].cursor()
     c.execute("DROP TABLE IF EXISTS %(table)s" % {
-        'table': getattr(settings, 'HISTORY_USER_TEMP_TABLE', 'history_user'),
+        'table': conf.USER_TEMP_TABLE,
     })

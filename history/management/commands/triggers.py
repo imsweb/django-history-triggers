@@ -1,35 +1,11 @@
-from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import connections, transaction
 from django.utils import six
 from django.utils.encoding import force_bytes
 
+from history import conf
+
 import hashlib
-
-
-HISTORY_SCHEMA_NAME = getattr(settings, 'HISTORY_SCHEMA', 'history')
-HISTORY_USER_TEMP_TABLE = getattr(settings, 'HISTORY_USER_TEMP_TABLE', 'history_user')
-HISTORY_USER_FIELD = getattr(settings, 'HISTORY_USER_FIELD', 'user_id')
-HISTORY_USER_TYPE = getattr(settings, 'HISTORY_USER_TYPE', 'integer')
-HISTORY_DEFAULT_USER = getattr(settings, 'HISTORY_DEFAULT_USER', 0)
-HISTORY_DEFAULT_USER_ERROR = getattr(settings, 'HISTORY_DEFAULT_USER_ERROR', False)
-
-# The database role that should own the history tables and triggers.
-DB_ROLE = getattr(settings, 'HISTORY_DB_ROLE', settings.DATABASES['default']['USER'])
-
-# Base tables which do not get history attached.
-IGNORED_TABLES = getattr(settings, 'HISTORY_IGNORED_TABLES', [])
-IGNORED_PREFIXES = getattr(settings, 'HISTORY_IGNORED_PREFIXES', ['django_', 'auth_', 'south_'])
-
-# Columns which should not be tracked in history tables.
-IGNORED_TYPES = getattr(settings, 'HISTORY_IGNORED_TYPES', ['bytea'])
-IGNORED_COLUMNS = getattr(settings, 'HISTORY_IGNORED_COLUMNS', [])
-
-# Controls the column type for the date_modified field on history tables.
-USE_TIMEZONES = getattr(settings, 'HISTORY_USE_TIMEZONES', True)
-
-# If set to True, old_value/new_value will be JSON records instead of tracking individual field updates.
-USE_JSON = getattr(settings, 'HISTORY_JSON', False)
 
 
 def truncate_long_name(name):
@@ -89,8 +65,8 @@ class Command (BaseCommand):
                     create_trigger(cursor, trigger_type, table_name, pk_name)
         print('%s triggers is complete. No errors were raised.' % action_verb)
         if options['clear']:
-            print('Dropping schema "%s"' % HISTORY_SCHEMA_NAME)
-            cursor.execute("DROP SCHEMA IF EXISTS %s CASCADE" % HISTORY_SCHEMA_NAME)
+            print('Dropping schema "%s"' % conf.SCHEMA_NAME)
+            cursor.execute("DROP SCHEMA IF EXISTS %s CASCADE" % conf.SCHEMA_NAME)
 
 
 def schema_exists(cursor, schema_name):
@@ -141,9 +117,9 @@ def get_base_tables(cursor, schema_name='public'):
     for row in cursor.fetchall():
         name = row[0].strip().lower()
         valid = True
-        if name in IGNORED_TABLES:
+        if name in conf.IGNORED_TABLES:
             valid = False
-        for prefix in IGNORED_PREFIXES:
+        for prefix in conf.IGNORED_PREFIXES:
             if name.startswith(prefix):
                 valid = False
         # Ignore tables without a PRIMARY KEY defined.
@@ -177,11 +153,11 @@ def get_table_columns(cursor, table_name, schema_name='public'):
         ORDER BY column_name
     """ % params)
     for row in cursor.fetchall():
-        if row[1].lower() in IGNORED_TYPES:
+        if row[1].lower() in conf.IGNORED_TYPES:
             continue
-        if row[0].lower() in IGNORED_COLUMNS:
+        if row[0].lower() in conf.IGNORED_COLUMNS:
             continue
-        if '%s.%s' % (table_name, row[0].lower()) in IGNORED_COLUMNS:
+        if '%s.%s' % (table_name, row[0].lower()) in conf.IGNORED_COLUMNS:
             continue
         yield row[0], row[1]
 
@@ -190,10 +166,10 @@ def create_history_schema(cursor):
     """
     Create the history schema if it doesn't already exist.
     """
-    if not schema_exists(cursor, HISTORY_SCHEMA_NAME):
+    if not schema_exists(cursor, conf.SCHEMA_NAME):
         params = {
-            'name': HISTORY_SCHEMA_NAME,
-            'role': DB_ROLE,
+            'name': conf.SCHEMA_NAME,
+            'role': conf.DB_ROLE,
         }
         cursor.execute("""
             CREATE SCHEMA %(name)s AUTHORIZATION %(role)s;
@@ -207,18 +183,18 @@ def create_history_table(cursor, base_table, pk_name, pk_type):
     Builds the history table (if it doesn't already exist) given the base table name.
     """
     history_table = truncate_long_name(base_table + '_history')
-    if not table_exists(cursor, history_table, HISTORY_SCHEMA_NAME):
+    if not table_exists(cursor, history_table, conf.SCHEMA_NAME):
         params = {
-            'schema': HISTORY_SCHEMA_NAME,
+            'schema': conf.SCHEMA_NAME,
             'table': history_table,
-            'role': DB_ROLE,
-            'timestamp_type': 'timestamp with time zone' if USE_TIMEZONES else 'timestamp',
+            'role': conf.DB_ROLE,
+            'timestamp_type': 'timestamp with time zone' if conf.USE_TIMEZONES else 'timestamp',
             'pk_name': pk_name,
             'pk_type': pk_type,
-            'user_field': HISTORY_USER_FIELD,
-            'user_type': HISTORY_USER_TYPE,
-            'field_column': '' if USE_JSON else 'field_name varchar(64) not null,',
-            'value_type': 'jsonb' if USE_JSON else 'text',
+            'user_field': conf.USER_FIELD,
+            'user_type': conf.USER_TYPE,
+            'field_column': '' if conf.USE_JSON else 'field_name varchar(64) not null,',
+            'value_type': 'jsonb' if conf.USE_JSON else 'text',
         }
         cursor.execute("""
             CREATE TABLE %(schema)s.%(table)s (
@@ -242,9 +218,9 @@ def get_field_history_sql(trigger_type, table_name, field_name, field_type, pk_n
     history_table_name = truncate_long_name(table_name + "_history")
     params = {
         'field': field_name,
-        'history_table': '%s.%s' % (HISTORY_SCHEMA_NAME, history_table_name),
+        'history_table': '%s.%s' % (conf.SCHEMA_NAME, history_table_name),
         'pk_name': pk_name,
-        'user_field': HISTORY_USER_FIELD,
+        'user_field': conf.USER_FIELD,
     }
     if trigger_type == 'insert':
         return """
@@ -273,9 +249,9 @@ def get_field_history_sql(trigger_type, table_name, field_name, field_type, pk_n
 def get_json_history_sql(trigger_type, table_name, pk_name):
     history_table_name = truncate_long_name(table_name + "_history")
     params = {
-        'history_table': '%s.%s' % (HISTORY_SCHEMA_NAME, history_table_name),
+        'history_table': '%s.%s' % (conf.SCHEMA_NAME, history_table_name),
         'pk_name': pk_name,
-        'user_field': HISTORY_USER_FIELD,
+        'user_field': conf.USER_FIELD,
     }
     if trigger_type == 'insert':
         return """
@@ -305,7 +281,7 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='publ
         return
     # First, create the function that the trigger will call for each row.
     body_sql = []
-    if USE_JSON:
+    if conf.USE_JSON:
         body_sql.append(get_json_history_sql(trigger_type, table_name, pk_name))
     else:
         for field_name, field_type in get_table_columns(cursor, table_name, table_schema):
@@ -315,14 +291,14 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema='publ
     params = {
         'fx_name': fx_name,
         'body': ''.join(body_sql),
-        'history_user_table': HISTORY_USER_TEMP_TABLE,
-        'history_user_field': HISTORY_USER_FIELD,
+        'history_user_table': conf.USER_TEMP_TABLE,
+        'history_user_field': conf.USER_FIELD,
         'return': 'OLD' if trigger_type == 'delete' else 'NEW',
-        'role': DB_ROLE,
-        'timestamp_type': 'timestamp with time zone' if USE_TIMEZONES else 'timestamp',
-        'user_type': HISTORY_USER_TYPE,
-        'default_user': maybe_quote(HISTORY_DEFAULT_USER),
-        'default_user_error': 'true' if HISTORY_DEFAULT_USER_ERROR else 'false',
+        'role': conf.DB_ROLE,
+        'timestamp_type': 'timestamp with time zone' if conf.USE_TIMEZONES else 'timestamp',
+        'user_type': conf.USER_TYPE,
+        'default_user': maybe_quote(conf.DEFAULT_USER),
+        'default_user_error': 'true' if conf.DEFAULT_USER_ERROR else 'false',
     }
     cursor.execute("""
         CREATE OR REPLACE FUNCTION %(fx_name)s() RETURNS trigger AS $BODY$

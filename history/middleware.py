@@ -5,6 +5,7 @@ Middleware that creates a temporary table for a connection and puts the current 
 from django.conf import settings
 from django.core.exceptions import MiddlewareNotUsed
 
+from . import conf
 from .utils import create_history_table, drop_history_table, get_history_user_id
 
 
@@ -17,18 +18,11 @@ class HistoryMiddleware (object):
         if 'postgresql' not in settings.DATABASES['default']['ENGINE']:
             raise MiddlewareNotUsed()
         self.get_response = get_response
-        self.ignore_paths = getattr(settings, 'HISTORY_MIDDLEWARE_IGNORE', NOT_SET)
-        if self.ignore_paths is NOT_SET:
-            self.ignore_paths = []
-            if settings.STATIC_URL:
-                self.ignore_paths.append(settings.STATIC_URL)
-            if settings.MEDIA_URL:
-                self.ignore_paths.append(settings.MEDIA_URL)
 
     def __call__(self, request):
         create_history = True
-        for prefix in self.ignore_paths:
-            if request.path.startswith(prefix):
+        for prefix in conf.MIDDLEWARE_IGNORE:
+            if prefix and request.path.startswith(prefix):
                 create_history = False
 
         if create_history:
