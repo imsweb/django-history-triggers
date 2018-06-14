@@ -33,3 +33,9 @@ Settings
 * `HISTORY_DEFAULT_USER_ERROR` (default: False)
 * `HISTORY_MIDDLEWARE_IGNORE` (default: [settings.STATIC_URL, settings.MEDIA_URL])
 * `HISTORY_JSON` (default: False)
+
+
+Running Unit Tests
+==================
+
+`docker-compose up --exit-code-from tests`
