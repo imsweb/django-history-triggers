@@ -4,14 +4,14 @@ import history
 
 
 setup(
-    name='django-history',
+    name='django-history-triggers',
     version=history.__version__,
     description='Management command and middleware for Django history triggers.',
     author='Dan Watson',
     author_email='watsond@imsweb.com',
-    url='https://git.imsweb.com/watsond/django-history',
+    url='https://github.com/imsweb/django-history-triggers',
     license='BSD',
-    packages=find_packages(),
+    packages=find_packages(exclude=('testapp',)),
     include_package_data=True,
     classifiers=[
         'Development Status :: 5 - Production/Stable',

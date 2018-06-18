@@ -1,3 +1,7 @@
 .project
 .pydevproject
+.DS_Store
+__pycache__
 *.pyc
+*.egg-info
+dist
