@@ -182,7 +182,7 @@ def create_history_table(cursor, base_table, pk_name, pk_type):
     """
     Builds the history table (if it doesn't already exist) given the base table name.
     """
-    history_table = truncate_long_name(base_table + '_history')
+    history_table = truncate_long_name(base_table + '_history').lower()
     if not table_exists(cursor, history_table, conf.SCHEMA_NAME):
         params = {
             'schema': conf.SCHEMA_NAME,
