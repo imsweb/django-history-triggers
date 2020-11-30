@@ -13,7 +13,6 @@ setup(
     license='BSD',
     packages=find_packages(),
     install_requires=[
-        django>=1.8,
         six>=1.12,
     ],
     include_package_data=True,
