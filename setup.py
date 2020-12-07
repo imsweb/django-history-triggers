@@ -13,7 +13,7 @@ setup(
     license='BSD',
     packages=find_packages(),
     install_requires=[
-        six>=1.12,
+        'six',
     ],
     include_package_data=True,
     classifiers=[
