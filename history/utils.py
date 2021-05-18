@@ -1,6 +1,9 @@
 from django.conf import settings
 from django.contrib.postgres.fields import JSONField
 from django.db import connections, models
+from django.utils.functional import cached_property
+
+from history.management.commands.triggers import get_base_tables, truncate_long_name
 
 from . import conf
 
@@ -34,7 +37,6 @@ def drop_history_table():
 
 
 def get_history_model(model_class):
-    from history.management.commands.triggers import get_base_tables, truncate_long_name  # TODO: move this
     cursor = connections['default'].cursor()
     table_names = get_base_tables(cursor)
     pk_name, pk_type = table_names[model_class._meta.db_table]
@@ -59,4 +61,11 @@ def get_history_model(model_class):
         'db_table': '"%s"."%s"' % (conf.SCHEMA_NAME, history_table),
         'managed': False,
     })
+
+    @cached_property
+    def transaction_type_formatted(self):
+        transaction_types = {'~': 'Modified', '+': 'Added', '-': 'Removed'}
+        return transaction_types.get(self.transaction_type)
+    attributes['transaction_type_formatted'] = transaction_type_formatted
+
     return type(type_name, (models.Model,), attributes)
