@@ -66,7 +66,7 @@ class HistoryAdminMixin:
 
     def history_view(self, request, object_id, extra_context=None):
         if not self.is_valid():
-            # If not valid, fall back to Djangos's default history view
+            # If not valid, fall back to Django's default history view
             return super().history_view(request, object_id, extra_context)
 
         obj = self.get_object(request, unquote(object_id))
