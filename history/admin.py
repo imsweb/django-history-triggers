@@ -1,4 +1,4 @@
-from bioshare.shortcuts import render
+from django.shortcuts import render
 from django.contrib.admin.utils import unquote
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
