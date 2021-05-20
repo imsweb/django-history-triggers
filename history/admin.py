@@ -59,6 +59,7 @@ class HistoryAdminMixin:
                 "title": f"{ model_class.__name__ } History",
                 "model_class_meta": model_class._meta,
                 "queryset": queryset,
+                **self.admin_site.each_context(request),
             }
         )
 
