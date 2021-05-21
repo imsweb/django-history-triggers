@@ -1,8 +1,8 @@
 from django.apps import AppConfig
 
 
-class HistoryConfig (AppConfig):
-    name = 'history'
+class HistoryConfig(AppConfig):
+    name = "history"
 
     def ready(self):
         pass
