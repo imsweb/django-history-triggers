@@ -26,17 +26,11 @@
             <thead>
                 <tr>
                     <th scope='col'>ID</th>
-                    {% if not use_json %}
-                        <th scope='col'>Field Name</th>
-                    {% endif %}
-                    <th scope='col'>Old Value</th>
-                    <th scope='col'>New Value</th>
-                    {% if use_json %}
-                        <th scope='col'>Changes</th>
-                    {% endif %}
-                    <th scope='col'>Date Modified</th>
+                    <th scope='col'>Date</th>
+                    <th scope='col'>Type</th>
                     <th scope='col'>User</th>
-                    <th scope='col'>Transaction Type</th>
+                    <th scope='col'>Snapshot</th>
+                    <th scope='col'>Changes</th>
                 </tr>
             </thead>
         {% endblock history-header %}
@@ -44,18 +38,12 @@
             <tbody>
                 {% for entry in history %}
                 <tr>
-                    <td><a href='{% url opts|admin_urlname:"change" entry.id %}' target="_blank" rel="noopener noreferrer">{{ entry.id }}</a></td>
-                    {% if not use_json %}
-                        <td>{{ entry.field_name }}</td>
-                    {% endif %}
-                    <td>{{ entry.old_value_formatted }}</td>
-                    <td>{{ entry.new_value_formatted }}</td>
-                    {% if use_json %}
-                        <td>{{ entry.changes_formatted }}</td>
-                    {% endif %}
-                    <td>{{ entry.date_modified }}</td>
-                    <td>{{ entry.user_key }}</td>
-                    <td>{{ entry.transaction_type_formatted }}</td>
+                    <td><a href='{% url opts|admin_urlname:"change" entry.pk %}' target="_blank" rel="noopener noreferrer">{{ entry.pk }}</a></td>
+                    <td>{{ entry.event_date }}</td>
+                    <td>{{ entry.event_type }}</td>
+                    <td>{{ entry.user_id }}</td>
+                    <td>{{ entry.snapshot }}</td>
+                    <td>{{ entry.changes }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

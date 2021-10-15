@@ -1,25 +1,19 @@
-from django.conf import settings
-from django.core.exceptions import MiddlewareNotUsed
-
-from . import conf
-from .utils import create_history_table, drop_history_table, get_history_user_id
-
-NOT_SET = object()
+from . import backends, conf
+from .utils import get_history_user_id
 
 
-class HistoryMiddleware(object):
+class HistoryMiddleware:
     """
     Middleware that creates a temporary table for a connection and puts the current
     User ID in there.
     """
 
     def __init__(self, get_response=None):
-        # Catch postgresql or postgis backends.
-        if ".post" not in settings.DATABASES["default"]["ENGINE"]:
-            raise MiddlewareNotUsed()
         self.get_response = get_response
 
     def __call__(self, request):
+        backend = None
+
         create_history = True
         for prefix in conf.MIDDLEWARE_IGNORE:
             if prefix and request.path.startswith(prefix):
@@ -28,12 +22,14 @@ class HistoryMiddleware(object):
         if create_history:
             user_id = get_history_user_id(request)
             if user_id is not None:
-                create_history_table(user_id)
+                backend = backends.get_backend()
+                backend.set_user(user_id)
 
         response = self.get_response(request)
 
         # Need to make sure we drop the history table after each request, since
         # connections can be re-used in later versions of Django.
-        drop_history_table()
+        if backend:
+            backend.clear_user()
 
         return response
