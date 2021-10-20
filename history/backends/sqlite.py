@@ -1,10 +1,28 @@
-from history import TriggerType, conf
+from django.db.utils import ProgrammingError
+
+from history import conf
+from history.models import TriggerType
 
 from .base import HistoryBackend
 
 
 class SQLiteHistoryBackend(HistoryBackend):
     supports_schemas = False
+
+    def set_user(self, user_id):
+        def current_user():
+            return user_id
+
+        self.conn.connection.create_function("current_user", 0, current_user)
+
+    def get_user(self):
+        return self.execute("SELECT current_user()", fetch=True)[0][0]
+
+    def clear_user(self):
+        def no_user():
+            raise ProgrammingError("No current_user set.")
+
+        self.conn.connection.create_function("current_user", 0, no_user)
 
     def _json_object(self, model, alias):
         """
@@ -83,7 +101,7 @@ class SQLiteHistoryBackend(HistoryBackend):
                     %(pk_ref)s.%(pk_name)s,
                     %(snapshot)s,
                     %(changes)s,
-                    (SELECT %(user_field)s FROM %(user_table)s),
+                    current_user(),
                     CURRENT_TIMESTAMP,
                     '%(type)s'
                 );
@@ -105,6 +123,7 @@ class SQLiteHistoryBackend(HistoryBackend):
                 "type": trigger_type.value,
             }
         )
+        return self.trigger_name(model, trigger_type)
 
     def drop_trigger(self, model, trigger_type):
         self.execute(

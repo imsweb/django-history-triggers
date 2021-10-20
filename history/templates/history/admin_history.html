@@ -1,5 +1,6 @@
 {% extends "admin/base_site.html" %}
 {% load i18n admin_urls %}
+{% load history %}
 
 {% block breadcrumbs %}
     <div class="breadcrumbs">
@@ -40,10 +41,10 @@
                 <tr>
                     <td><a href='{% url opts|admin_urlname:"change" entry.pk %}' target="_blank" rel="noopener noreferrer">{{ entry.pk }}</a></td>
                     <td>{{ entry.event_date }}</td>
-                    <td>{{ entry.event_type }}</td>
-                    <td>{{ entry.user_id }}</td>
-                    <td>{{ entry.snapshot }}</td>
-                    <td>{{ entry.changes }}</td>
+                    <td>{{ entry.get_event_type_display }}</td>
+                    <td>{{ entry.get_user }}</td>
+                    <td>{% format_json entry.snapshot %}</td>
+                    <td>{% format_json entry.changes valsep=": " arrsep=" &rarr; " %}</td>
                 </tr>
                 {% endfor %}
             </tbody>

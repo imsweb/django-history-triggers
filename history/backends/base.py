@@ -13,7 +13,13 @@ class HistoryBackend:
         self.conn = connection
 
     def get_models(self):
-        return apps.get_models(include_auto_created=True)
+        # TODO: specify apps/excludes in settings and in CLI
+        return [
+            model
+            for model in apps.get_models(include_auto_created=True)
+            if not issubclass(model, HistoricalModel)
+            and model._meta.app_label not in ("auth", "sessions", "contenttypes")
+        ]
 
     def historical_model(self, model):
         user_field = (
@@ -36,39 +42,25 @@ class HistoryBackend:
         )
         return type(type_name, (HistoricalModel,), model_attrs)
 
-    def execute(self, sql, params=None, cursor=None):
+    def execute(self, sql, params=None, cursor=None, fetch=False):
         if cursor:
-            return cursor.execute(sql, params)
+            cursor.execute(sql, params)
+            if fetch:
+                return cursor.fetchall()
         else:
             with self.conn.cursor() as cursor:
-                return cursor.execute(sql, params)
+                cursor.execute(sql, params)
+                if fetch:
+                    return cursor.fetchall()
 
     def set_user(self, user_id):
-        params = {
-            "table": conf.USER_TEMP_TABLE,
-            "field": conf.USER_FIELD,
-            "type": conf.USER_TYPE,
-        }
-        self.execute(
-            """
-            CREATE TEMPORARY TABLE IF NOT EXISTS %(table)s (
-                %(field)s %(type)s UNIQUE NOT NULL
-            );
-            TRUNCATE %(table)s;
-        """
-            % params
-        )
-        self.execute(
-            "INSERT INTO %(table)s (%(field)s) VALUES (%%s);" % params, (user_id,)
-        )
+        raise NotImplementedError()
+
+    def get_user(self):
+        raise NotImplementedError()
 
     def clear_user(self):
-        self.execute(
-            "DROP TABLE IF EXISTS %(table)s;"
-            % {
-                "table": conf.USER_TEMP_TABLE,
-            }
-        )
+        raise NotImplementedError()
 
     def history_table_name(self, name):
         qn = split_identifier(name)[1]
@@ -84,8 +76,9 @@ class HistoryBackend:
         return qn
 
     def trigger_name(self, model, trigger_type, prefix="trig"):
+        table_name = split_identifier(model._meta.db_table)[1]
         return truncate_name(
-            "{}_{}_{}".format(prefix, model._meta.db_table, trigger_type.name.lower())
+            "{}_{}_{}".format(prefix, table_name, trigger_type.name.lower())
         )
 
     def create_schema(self):

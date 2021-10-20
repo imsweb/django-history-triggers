@@ -1,9 +1,43 @@
-from history import TriggerType, conf
+from history import conf
+from history.models import TriggerType
 
 from .base import HistoryBackend
 
 
 class PostgresHistoryBackend(HistoryBackend):
+    def set_user(self, user_id):
+        params = {
+            "table": conf.USER_TEMP_TABLE,
+            "field": conf.USER_FIELD,
+            "type": conf.USER_TYPE,
+        }
+        self.execute(
+            """
+            DROP TABLE IF EXISTS %(table)s;
+            CREATE TEMPORARY TABLE %(table)s AS (SELECT %%s::%(type)s AS %(field)s);
+            """
+            % params,
+            (user_id,),
+        )
+
+    def get_user(self):
+        return self.execute(
+            "SELECT %(field)s FROM %(table)s"
+            % {
+                "table": conf.USER_TEMP_TABLE,
+                "field": conf.USER_FIELD,
+            },
+            fetch=True,
+        )[0][0]
+
+    def clear_user(self):
+        self.execute(
+            "DROP TABLE IF EXISTS %(table)s;"
+            % {
+                "table": conf.USER_TEMP_TABLE,
+            }
+        )
+
     def create_schema(self):
         self.execute("CREATE SCHEMA IF NOT EXISTS {};".format(conf.SCHEMA_NAME))
 
@@ -36,7 +70,7 @@ class PostgresHistoryBackend(HistoryBackend):
             """
             CREATE OR REPLACE FUNCTION %(fx_name)s() RETURNS trigger AS $BODY$
                 DECLARE
-                    _changes %(json_type)s := '{}'::%(json_type)s;
+                    _changes %(json_type)s := %(default)s::%(json_type)s;
                 BEGIN
                     %(changes)s
 
@@ -70,6 +104,7 @@ class PostgresHistoryBackend(HistoryBackend):
                 "user_table": conf.USER_TEMP_TABLE,
                 "return": "OLD" if trigger_type == TriggerType.DELETE else "NEW",
                 "json_type": self.conn.data_types["JSONField"],
+                "default": "'{}'" if trigger_type.changes else "NULL",
                 "changes": "".join(parts) if trigger_type.changes else "",
                 "type": trigger_type.value,
             }
@@ -78,7 +113,7 @@ class PostgresHistoryBackend(HistoryBackend):
         self.execute(
             """
             CREATE TRIGGER %(tr_name)s
-                AFTER %(trans_type)s ON "%(table)s"
+                AFTER %(trans_type)s ON %(table)s
                 FOR EACH ROW EXECUTE PROCEDURE %(fx_name)s();
             """
             % {
@@ -89,9 +124,11 @@ class PostgresHistoryBackend(HistoryBackend):
             }
         )
 
+        return self.trigger_name(model, trigger_type, prefix="tr")
+
     def drop_trigger(self, model, trigger_type):
         self.execute(
-            'DROP TRIGGER IF EXISTS %(tr_name)s ON "%(table)s";'
+            "DROP TRIGGER IF EXISTS %(tr_name)s ON %(table)s;"
             % {
                 "tr_name": self.trigger_name(model, trigger_type, prefix="tr"),
                 "table": model._meta.db_table,
@@ -100,6 +137,6 @@ class PostgresHistoryBackend(HistoryBackend):
         self.execute(
             "DROP FUNCTION IF EXISTS %(fx_name)s();"
             % {
-                "fx_name": self.trigger_name(model, trigger_type),
+                "fx_name": self.trigger_name(model, trigger_type, prefix="fx"),
             }
         )
