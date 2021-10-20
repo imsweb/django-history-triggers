@@ -13,16 +13,18 @@ class SQLiteHistoryBackend(HistoryBackend):
         def current_user():
             return user_id
 
-        self.conn.connection.create_function("current_user", 0, current_user)
+        self.conn.connection.create_function(conf.USER_TEMP_TABLE, 0, current_user)
 
     def get_user(self):
-        return self.execute("SELECT current_user()", fetch=True)[0][0]
+        return self.execute(
+            "SELECT %(func)s()" % {"func": conf.USER_TEMP_TABLE}, fetch=True
+        )[0][0]
 
     def clear_user(self):
         def no_user():
-            raise ProgrammingError("No current_user set.")
+            raise ProgrammingError("No {} set.".format(conf.USER_TEMP_TABLE))
 
-        self.conn.connection.create_function("current_user", 0, no_user)
+        self.conn.connection.create_function(conf.USER_TEMP_TABLE, 0, no_user)
 
     def _json_object(self, model, alias):
         """
@@ -101,7 +103,7 @@ class SQLiteHistoryBackend(HistoryBackend):
                     %(pk_ref)s.%(pk_name)s,
                     %(snapshot)s,
                     %(changes)s,
-                    current_user(),
+                    %(user_table)s(),
                     CURRENT_TIMESTAMP,
                     '%(type)s'
                 );

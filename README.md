@@ -1,7 +1,7 @@
 Requirements
 ============
 
-* Django 2.2+
+* Django 3.0+
 * PostgreSQL or SQLite database
 
 
