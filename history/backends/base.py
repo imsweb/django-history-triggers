@@ -12,13 +12,16 @@ class HistoryBackend:
     def __init__(self, connection):
         self.conn = connection
 
+    def setup(self):
+        pass
+
     def get_models(self):
         # TODO: specify apps/excludes in settings and in CLI
         return [
             model
             for model in apps.get_models(include_auto_created=True)
             if not issubclass(model, HistoricalModel)
-            and model._meta.app_label not in ("auth", "sessions", "contenttypes")
+            and model._meta.app_label not in ("sessions", "contenttypes")
         ]
 
     def historical_model(self, model):
@@ -90,32 +93,31 @@ class HistoryBackend:
     def create_history_table(self, model):
         self.execute(
             """
-            CREATE TABLE IF NOT EXISTS %(table)s (
-                %(pk_name)s %(pk_type)s not null,
-                snapshot %(json_type)s,
-                changes %(json_type)s,
-                %(user_field)s %(user_type)s,
-                event_date %(timestamp_type)s not null,
-                event_type char(1) not null
+            CREATE TABLE IF NOT EXISTS {table} (
+                {pk_name} {pk_type} NOT NULL,
+                snapshot {json_type},
+                changes {json_type},
+                {user_field} {user_type}{user_null},
+                event_date {timestamp_type} NOT NULL,
+                event_type char(1) NOT NULL
             );
-            """
-            % {
-                "table": self.history_table_name(model._meta.db_table),
-                "pk_name": model._meta.pk.name,
-                "pk_type": model._meta.pk.rel_db_type(self.conn),
-                "timestamp_type": self.conn.data_types["DateTimeField"],
-                "json_type": self.conn.data_types["JSONField"],
-                "user_field": conf.USER_FIELD,
-                "user_type": conf.USER_TYPE,
-            }
+            """.format(
+                table=self.history_table_name(model._meta.db_table),
+                pk_name=model._meta.pk.name,
+                pk_type=model._meta.pk.rel_db_type(self.conn),
+                timestamp_type=self.conn.data_types["DateTimeField"],
+                json_type=self.conn.data_types["JSONField"],
+                user_field=conf.USER_FIELD,
+                user_type=conf.USER_TYPE,
+                user_null="" if conf.USER_NULLABLE else " NOT NULL",
+            )
         )
 
     def drop_history_table(self, model):
         self.execute(
-            "DROP TABLE IF EXISTS %(table)s"
-            % {
-                "table": self.history_table_name(model._meta.db_table),
-            }
+            "DROP TABLE IF EXISTS {table}".format(
+                table=self.history_table_name(model._meta.db_table),
+            )
         )
 
     def create_trigger(self, model, trigger_type):

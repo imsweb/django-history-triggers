@@ -1,5 +1,6 @@
+from django.utils.module_loading import import_string
+
 from . import backends, conf
-from .utils import get_history_user_id
 
 
 class HistoryMiddleware:
@@ -10,6 +11,11 @@ class HistoryMiddleware:
 
     def __init__(self, get_response=None):
         self.get_response = get_response
+        self.get_user = (
+            conf.REQUEST_USER
+            if callable(conf.REQUEST_USER)
+            else import_string(conf.REQUEST_USER)
+        )
 
     def __call__(self, request):
         backend = None
@@ -20,10 +26,8 @@ class HistoryMiddleware:
                 create_history = False
 
         if create_history:
-            user_id = get_history_user_id(request)
-            if user_id is not None:
-                backend = backends.get_backend()
-                backend.set_user(user_id)
+            backend = backends.get_backend()
+            backend.set_user(self.get_user(request))
 
         response = self.get_response(request)
 

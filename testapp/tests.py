@@ -1,5 +1,4 @@
 from django.core.management import call_command
-from django.db.utils import DatabaseError
 from django.test import TestCase
 
 from history import backends
@@ -18,7 +17,7 @@ class UtilsTests(TestCase):
         self.backend.set_user(88)
         self.assertEqual(self.backend.get_user(), 88)
         self.backend.clear_user()
-        self.assertRaises(DatabaseError, self.backend.get_user)
+        self.assertEqual(self.backend.get_user(), None)
 
 
 class CommandTests(TestCase):
@@ -63,3 +62,20 @@ class ModelTests(TestCase):
         self.assertIsNone(delete.changes)
         self.assertEqual(delete.pk, pk)
         self.assertEqual(delete.user_id, 42)
+
+
+class MiddlewareTests(TestCase):
+    def setUp(self):
+        self.backend = backends.get_backend()
+        call_command("triggers", "--quiet")
+
+    def tearDown(self):
+        call_command("triggers", "--quiet", "drop")
+        call_command("triggers", "--quiet", "clear")
+
+    def test_lifecycle(self):
+        r = self.client.get("/lifecycle/")
+        self.assertEqual(r.json(), {})
+        AuthorHistory = get_history_model(Author)
+        insert = AuthorHistory.objects.get(event_type="+")
+        self.assertEqual(insert.user_id, 42)

@@ -1,6 +1,12 @@
 import os
 import secrets
 
+
+# Fake getting the request's user for testing purposes.
+def test_request_user(request):
+    return 42
+
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = secrets.token_urlsafe()
 DEBUG = True
@@ -76,3 +82,5 @@ USE_TZ = True
 STATIC_URL = "/static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+HISTORY_REQUEST_USER = test_request_user

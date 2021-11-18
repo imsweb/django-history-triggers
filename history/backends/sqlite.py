@@ -1,5 +1,3 @@
-from django.db.utils import ProgrammingError
-
 from history import conf
 from history.models import TriggerType
 
@@ -9,22 +7,27 @@ from .base import HistoryBackend
 class SQLiteHistoryBackend(HistoryBackend):
     supports_schemas = False
 
+    def setup(self):
+        self.clear_user()
+
     def set_user(self, user_id):
         def current_user():
             return user_id
 
-        self.conn.connection.create_function(conf.USER_TEMP_TABLE, 0, current_user)
+        self.conn.ensure_connection()
+        self.conn.connection.create_function(conf.USER_FUNCION, 0, current_user)
 
     def get_user(self):
         return self.execute(
-            "SELECT %(func)s()" % {"func": conf.USER_TEMP_TABLE}, fetch=True
+            "SELECT {func}()".format(func=conf.USER_FUNCION), fetch=True
         )[0][0]
 
     def clear_user(self):
         def no_user():
-            raise ProgrammingError("No {} set.".format(conf.USER_TEMP_TABLE))
+            return None
 
-        self.conn.connection.create_function(conf.USER_TEMP_TABLE, 0, no_user)
+        self.conn.ensure_connection()
+        self.conn.connection.create_function(conf.USER_FUNCION, 0, no_user)
 
     def _json_object(self, model, alias):
         """
@@ -69,13 +72,13 @@ class SQLiteHistoryBackend(HistoryBackend):
                 FROM
                     json_each(
                         json_array(
-                            %(values)s
+                            {values}
                         )
                     )
                 WHERE oldval IS NOT newval))
-        """ % {
-            "values": ", ".join(parts)
-        }
+        """.format(
+            values=", ".join(parts)
+        )
 
     def create_schema(self):
         pass
@@ -90,47 +93,43 @@ class SQLiteHistoryBackend(HistoryBackend):
         self.drop_trigger(model, trigger_type)
         self.execute(
             """
-            CREATE TRIGGER %(trigger_name)s AFTER %(action)s ON %(table)s BEGIN
-                INSERT INTO %(history_table)s (
-                    %(pk_name)s,
+            CREATE TRIGGER {trigger_name} AFTER {action} ON {table} BEGIN
+                INSERT INTO {history_table} (
+                    {pk_name},
                     snapshot,
                     changes,
-                    %(user_field)s,
+                    {user_field},
                     event_date,
                     event_type
                 )
                 VALUES (
-                    %(pk_ref)s.%(pk_name)s,
-                    %(snapshot)s,
-                    %(changes)s,
-                    %(user_table)s(),
+                    {pk_ref}.{pk_name},
+                    {snapshot},
+                    {changes},
+                    {user_func}(),
                     CURRENT_TIMESTAMP,
-                    '%(type)s'
+                    '{type}'
                 );
             END;
-            """
-            % {
-                "trigger_name": self.trigger_name(model, trigger_type),
-                "action": trigger_type.name,
-                "table": model._meta.db_table,
-                "history_table": self.history_table_name(model._meta.db_table),
-                "pk_name": model._meta.pk.column,
-                "pk_ref": trigger_type.snapshot,
-                "user_field": conf.USER_FIELD,
-                "user_table": conf.USER_TEMP_TABLE,
-                "snapshot": self._json_object(model, trigger_type.snapshot),
-                "changes": self._json_changes(model)
-                if trigger_type.changes
-                else "NULL",
-                "type": trigger_type.value,
-            }
+            """.format(
+                trigger_name=self.trigger_name(model, trigger_type),
+                action=trigger_type.name,
+                table=model._meta.db_table,
+                history_table=self.history_table_name(model._meta.db_table),
+                pk_name=model._meta.pk.column,
+                pk_ref=trigger_type.snapshot,
+                user_field=conf.USER_FIELD,
+                user_func=conf.USER_FUNCION,
+                snapshot=self._json_object(model, trigger_type.snapshot),
+                changes=self._json_changes(model) if trigger_type.changes else "NULL",
+                type=trigger_type.value,
+            )
         )
         return self.trigger_name(model, trigger_type)
 
     def drop_trigger(self, model, trigger_type):
         self.execute(
-            "DROP TRIGGER IF EXISTS %(trigger_name)s;"
-            % {
-                "trigger_name": self.trigger_name(model, trigger_type),
-            }
+            "DROP TRIGGER IF EXISTS {trigger_name};".format(
+                trigger_name=self.trigger_name(model, trigger_type),
+            )
         )
