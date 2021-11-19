@@ -5,51 +5,24 @@ from .base import HistoryBackend
 
 
 class PostgresHistoryBackend(HistoryBackend):
-    def setup(self):
-        self.execute(
-            """
-            CREATE OR REPLACE FUNCTION {func}() RETURNS {type} AS $BODY$
-            DECLARE
-                _user_id {type} := NULL;
-                _exists boolean;
-            BEGIN
-                EXECUTE 'SELECT EXISTS(SELECT 1 FROM information_schema.tables
-                    WHERE table_name = ''{table}'')' INTO _exists;
-                IF _exists THEN
-                    EXECUTE 'SELECT {field} FROM {table}' INTO _user_id;
-                END IF;
-                RETURN _user_id;
-            END;$BODY$
-            LANGUAGE 'plpgsql' VOLATILE;
-            """.format(
-                func=conf.USER_FUNCION,
-                type=conf.USER_TYPE,
-                table=conf.USER_TEMP_TABLE,
-                field=conf.USER_FIELD,
-            )
-        )
-
     def set_user(self, user_id):
+        if user_id is not None:
+            user_id = str(user_id)
         self.execute(
-            """
-            DROP TABLE IF EXISTS {table};
-            CREATE TEMPORARY TABLE {table} AS (SELECT %s::{type} AS {field});
-            """.format(
-                table=conf.USER_TEMP_TABLE,
-                field=conf.USER_FIELD,
-                type=conf.USER_TYPE,
+            "SELECT set_config('{config}', %s, false);".format(
+                config=conf.USER_VARIABLE,
             ),
             (user_id,),
         )
 
     def get_user(self):
         return self.execute(
-            "SELECT {func}()".format(func=conf.USER_FUNCION),
+            "SELECT nullif(current_setting('{config}', true), '')::{cast};".format(
+                config=conf.USER_VARIABLE,
+                cast=self.user_type,
+            ),
             fetch=True,
         )[0][0]
-
-    def clear_user(self):
-        self.execute("DROP TABLE IF EXISTS {};".format(conf.USER_TEMP_TABLE))
 
     def create_schema(self):
         self.execute("CREATE SCHEMA IF NOT EXISTS {};".format(conf.SCHEMA_NAME))
@@ -87,10 +60,10 @@ class PostgresHistoryBackend(HistoryBackend):
                     {changes}
 
                     INSERT INTO {table} (
-                        {pk_name},
+                        object_id,
                         snapshot,
                         changes,
-                        {user_field},
+                        {user_col},
                         event_date,
                         event_type
                     )
@@ -98,7 +71,7 @@ class PostgresHistoryBackend(HistoryBackend):
                         {pk_ref}.{pk_name},
                         row_to_json({pk_ref}),
                         _changes,
-                        get_{user_table}(),
+                        (SELECT nullif(current_setting('{config}', true), '')::{cast}),
                         now(),
                         '{type}'
                     );
@@ -109,10 +82,11 @@ class PostgresHistoryBackend(HistoryBackend):
             """.format(
                 fx_name=self.trigger_name(model, trigger_type, prefix="fx"),
                 table=self.history_table_name(model._meta.db_table),
+                user_col=self.user_column,
                 pk_name=model._meta.pk.name,
                 pk_ref=trigger_type.snapshot,
-                user_field=conf.USER_FIELD,
-                user_table=conf.USER_TEMP_TABLE,
+                config=conf.USER_VARIABLE,
+                cast=self.user_type,
                 return_val="OLD" if trigger_type == TriggerType.DELETE else "NEW",
                 json_type=self.conn.data_types["JSONField"],
                 default="'{}'" if trigger_type.changes else "NULL",

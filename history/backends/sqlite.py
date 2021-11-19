@@ -7,6 +7,10 @@ from .base import HistoryBackend
 class SQLiteHistoryBackend(HistoryBackend):
     supports_schemas = False
 
+    @property
+    def func_name(self):
+        return "get_" + conf.USER_VARIABLE.replace(".", "_")
+
     def setup(self):
         self.clear_user()
 
@@ -15,19 +19,12 @@ class SQLiteHistoryBackend(HistoryBackend):
             return user_id
 
         self.conn.ensure_connection()
-        self.conn.connection.create_function(conf.USER_FUNCION, 0, current_user)
+        self.conn.connection.create_function(self.func_name, 0, current_user)
 
     def get_user(self):
-        return self.execute(
-            "SELECT {func}()".format(func=conf.USER_FUNCION), fetch=True
-        )[0][0]
-
-    def clear_user(self):
-        def no_user():
-            return None
-
-        self.conn.ensure_connection()
-        self.conn.connection.create_function(conf.USER_FUNCION, 0, no_user)
+        return self.execute("SELECT {func}()".format(func=self.func_name), fetch=True)[
+            0
+        ][0]
 
     def _json_object(self, model, alias):
         """
@@ -95,10 +92,10 @@ class SQLiteHistoryBackend(HistoryBackend):
             """
             CREATE TRIGGER {trigger_name} AFTER {action} ON {table} BEGIN
                 INSERT INTO {history_table} (
-                    {pk_name},
+                    object_id,
                     snapshot,
                     changes,
-                    {user_field},
+                    {user_col},
                     event_date,
                     event_type
                 )
@@ -116,10 +113,10 @@ class SQLiteHistoryBackend(HistoryBackend):
                 action=trigger_type.name,
                 table=model._meta.db_table,
                 history_table=self.history_table_name(model._meta.db_table),
+                user_col=self.user_column,
                 pk_name=model._meta.pk.column,
                 pk_ref=trigger_type.snapshot,
-                user_field=conf.USER_FIELD,
-                user_func=conf.USER_FUNCION,
+                user_func=self.func_name,
                 snapshot=self._json_object(model, trigger_type.snapshot),
                 changes=self._json_changes(model) if trigger_type.changes else "NULL",
                 type=trigger_type.value,

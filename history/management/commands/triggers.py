@@ -1,5 +1,4 @@
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 from history import backends
 from history.models import TriggerType
@@ -36,7 +35,6 @@ class Command(BaseCommand):
     def handle_clear(self, backend, **options):
         backend.drop_schema()
 
-    @transaction.atomic
     def handle(self, **options):
         backend = backends.get_backend()
         action = options.get("action") or "create"

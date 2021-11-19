@@ -1,6 +1,7 @@
 from django.apps import apps
 from django.db import models
 from django.db.backends.utils import split_identifier, truncate_name
+from django.utils.module_loading import import_string
 
 from history import conf
 from history.models import HistoricalModel
@@ -11,6 +12,36 @@ class HistoryBackend:
 
     def __init__(self, connection):
         self.conn = connection
+        self.user_field = None
+        self.user_column = None
+        self.user_type = None
+        # Get and store the user field, type, and column name.
+        model_or_field = (
+            conf.USER_MODEL()
+            if callable(conf.USER_MODEL)
+            else import_string(conf.USER_MODEL)()
+        )
+        if issubclass(model_or_field, models.Model):
+            self.user_field = models.ForeignKey(
+                model_or_field,
+                db_constraint=False,
+                related_name="+",
+                on_delete=models.DO_NOTHING,
+            )
+            self.user_column = conf.USER_FIELD + "_id"
+        elif issubclass(model_or_field, models.Field):
+            self.user_field = model_or_field
+            if self.user_field.db_column:
+                # If the custom field specifies a column name, use it.
+                self.user_column = self.user_field.db_column
+            elif isinstance(self.user_field, models.ForeignKey):
+                # ForeignKey columns get suffixed with _id by default.
+                self.user_column = conf.USER_FIELD + "_id"
+            else:
+                # Non-FK fields without a db_column just use the attribute name.
+                self.user_column = conf.USER_FIELD
+        if self.user_field:
+            self.user_type = self.user_field.rel_db_type(self.conn)
 
     def setup(self):
         pass
@@ -25,15 +56,21 @@ class HistoryBackend:
         ]
 
     def historical_model(self, model):
-        user_field = (
-            models.IntegerField if "int" in conf.USER_TYPE else models.TextField
-        )
+        type_name = "%sHistory" % model.__name__
+        try:
+            return apps.get_model("history", type_name)
+        except LookupError:
+            pass
         model_attrs = {
             "__module__": "history.models",
-            model._meta.pk.name: model._meta.pk.__class__(primary_key=True),
-            conf.USER_FIELD: user_field(),
+            "object": models.ForeignKey(
+                model,
+                db_constraint=False,
+                related_name=conf.RELATED_NAME,
+                on_delete=models.DO_NOTHING,
+            ),
+            conf.USER_FIELD: self.user_field.clone(),
         }
-        type_name = "%sHistory" % model.__name__
         meta_name = "%sMeta" % model.__name__
         model_attrs["Meta"] = type(
             meta_name,
@@ -63,7 +100,7 @@ class HistoryBackend:
         raise NotImplementedError()
 
     def clear_user(self):
-        raise NotImplementedError()
+        self.set_user(None)
 
     def history_table_name(self, name):
         qn = split_identifier(name)[1]
@@ -91,34 +128,14 @@ class HistoryBackend:
         raise NotImplementedError()
 
     def create_history_table(self, model):
-        self.execute(
-            """
-            CREATE TABLE IF NOT EXISTS {table} (
-                {pk_name} {pk_type} NOT NULL,
-                snapshot {json_type},
-                changes {json_type},
-                {user_field} {user_type}{user_null},
-                event_date {timestamp_type} NOT NULL,
-                event_type char(1) NOT NULL
-            );
-            """.format(
-                table=self.history_table_name(model._meta.db_table),
-                pk_name=model._meta.pk.name,
-                pk_type=model._meta.pk.rel_db_type(self.conn),
-                timestamp_type=self.conn.data_types["DateTimeField"],
-                json_type=self.conn.data_types["JSONField"],
-                user_field=conf.USER_FIELD,
-                user_type=conf.USER_TYPE,
-                user_null="" if conf.USER_NULLABLE else " NOT NULL",
-            )
-        )
+        history_model = self.historical_model(model)
+        with self.conn.schema_editor() as schema:
+            schema.create_model(history_model)
 
     def drop_history_table(self, model):
-        self.execute(
-            "DROP TABLE IF EXISTS {table}".format(
-                table=self.history_table_name(model._meta.db_table),
-            )
-        )
+        history_model = self.historical_model(model)
+        with self.conn.schema_editor() as schema:
+            schema.delete_model(history_model)
 
     def create_trigger(self, model, trigger_type):
         raise NotImplementedError()
