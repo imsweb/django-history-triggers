@@ -1,10 +1,14 @@
+import os
+import re
+
 from setuptools import find_packages, setup
 
-import history
+with open(os.path.join("history", "__init__.py"), "r") as src:
+    version = re.match(r'.*__version__ = "(.*?)"', src.read(), re.S).group(1)
 
 setup(
     name="django-history-triggers",
-    version=history.__version__,
+    version=version,
     description="Management command and middleware for Django history triggers.",
     author="Dan Watson",
     author_email="watsond@imsweb.com",

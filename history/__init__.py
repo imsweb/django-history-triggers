@@ -1,4 +1,18 @@
-__version_info__ = (3, 0, 0)
-__version__ = ".".join(str(i) for i in __version_info__)
+from django.apps import apps
+from django.conf import settings
 
-default_app_config = "history.apps.HistoryConfig"
+__version__ = "3.0.0"
+__version_info__ = tuple(int(num) for num in __version__.split(".") if num.isdigit())
+
+
+def get_history_model():
+    return apps.get_model(
+        getattr(settings, "HISTORY_MODEL", "history.ObjectHistory"), require_ready=False
+    )
+
+
+def get_request_user(request):
+    try:
+        return request.user.pk
+    except AttributeError:
+        return None

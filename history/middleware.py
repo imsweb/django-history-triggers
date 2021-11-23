@@ -18,22 +18,10 @@ class HistoryMiddleware:
         )
 
     def __call__(self, request):
-        backend = None
-
-        create_history = True
         for prefix in conf.MIDDLEWARE_IGNORE:
             if prefix and request.path.startswith(prefix):
-                create_history = False
+                return self.get_response(request)
 
-        if create_history:
-            backend = backends.get_backend()
-            backend.set_user(self.get_user(request))
-
-        response = self.get_response(request)
-
-        # Need to make sure we drop the history table after each request, since
-        # connections can be re-used in later versions of Django.
-        if backend:
-            backend.clear_user()
-
-        return response
+        backend = backends.get_backend()
+        with backend.session(self.get_user(request)):
+            return self.get_response(request)

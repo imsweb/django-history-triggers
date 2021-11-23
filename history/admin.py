@@ -1,12 +1,14 @@
-import logging
-
+from django.contrib import admin
 from django.contrib.admin.utils import unquote
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from django.template.response import TemplateResponse
+from django.utils.translation import gettext_lazy as _
 
-from .utils import get_history_model
+from history import conf, get_history_model
+from history.templatetags.history import format_json
 
-logger = logging.getLogger(__name__)
+HistoryModel = get_history_model()
 
 
 class HistoryAdminMixin:
@@ -15,10 +17,13 @@ class HistoryAdminMixin:
 
     def show_history(self, request, queryset, extra_context=None):
         model_class = queryset.model
-
-        history_model = get_history_model(model_class)
-        object_history = history_model.objects.filter(
-            pk__in=queryset.values_list("pk", flat=True)
+        ct = ContentType.objects.get_for_model(model_class)
+        object_history = (
+            get_history_model()
+            .objects.filter(
+                content_type=ct, object_id__in=queryset.values_list("pk", flat=True)
+            )
+            .order_by("session_date")
         )
 
         context = {
@@ -38,5 +43,57 @@ class HistoryAdminMixin:
         if not self.has_view_or_change_permission(request, obj):
             raise PermissionDenied
 
-        queryset = self.model.objects.filter(id=unquote(object_id))
+        queryset = self.model.objects.filter(pk=unquote(object_id))
         return self.show_history(request, queryset, extra_context=extra_context)
+
+
+class HistoryAdmin(HistoryAdminMixin, admin.ModelAdmin):
+    pass
+
+
+class ObjectHistoryAdmin(admin.ModelAdmin):
+    list_display = [
+        "session_id",
+        "session_date",
+        "change_type",
+        "content_type",
+        "object_id",
+    ]
+    list_filter = ["change_type", "content_type"]
+
+    @admin.display(description=_("Snapshot"))
+    def snapshot_html(self, obj):
+        return format_json(obj.snapshot)
+
+    @admin.display(description=_("Changes"))
+    def changes_html(self, obj):
+        return format_json(obj.changes, valsep=": ", arrsep=" &rarr; ")
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = [
+            "id",
+            "session_id",
+            "session_date",
+            "change_type",
+            "content_type",
+            "object_id",
+            "snapshot_html",
+            "changes_html",
+            HistoryModel.USER_FIELD,
+        ]
+        if obj and obj.change_type in ("I", "D"):
+            fields.remove("changes_html")
+        return fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+if conf.ADMIN_ENABLED:
+    admin.site.register(HistoryModel, ObjectHistoryAdmin)

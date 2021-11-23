@@ -26,12 +26,13 @@
         {% block history-header %}
             <thead>
                 <tr>
-                    <th scope='col'>ID</th>
-                    <th scope='col'>Date</th>
-                    <th scope='col'>Type</th>
-                    <th scope='col'>User</th>
-                    <th scope='col'>Snapshot</th>
-                    <th scope='col'>Changes</th>
+                    <th scope='col'>{% trans "ID" %}</th>
+                    <th scope='col'>{% trans "Session" %}</th>
+                    <th scope='col'>{% trans "Date" %}</th>
+                    <th scope='col'>{% trans "Type" %}</th>
+                    <th scope='col'>{% trans "User" %}</th>
+                    <th scope='col'>{% trans "Snapshot" %}</th>
+                    <th scope='col'>{% trans "Changes" %}</th>
                 </tr>
             </thead>
         {% endblock history-header %}
@@ -39,9 +40,10 @@
             <tbody>
                 {% for entry in history %}
                 <tr>
-                    <td><a href='{% url opts|admin_urlname:"change" entry.pk %}' target="_blank" rel="noopener noreferrer">{{ entry.pk }}</a></td>
-                    <td>{{ entry.event_date }}</td>
-                    <td>{{ entry.get_event_type_display }}</td>
+                    <td><a href='{% url opts|admin_urlname:"change" entry.object_id %}' rel="noopener noreferrer">{{ entry.object_id }}</a></td>
+                    <td>{{ entry.session_id }}</td>
+                    <td>{{ entry.session_date }}</td>
+                    <td>{{ entry.get_change_type_display }}</td>
                     <td>{{ entry.get_user }}</td>
                     <td>{% format_json entry.snapshot %}</td>
                     <td>{% format_json entry.changes valsep=": " arrsep=" &rarr; " %}</td>

@@ -1,30 +1,45 @@
-from history import conf
-from history.models import TriggerType
+import uuid
 
-from .base import HistoryBackend
+from django.contrib.contenttypes.models import ContentType
+from django.db import models
+from django.utils import timezone
+
+from history import get_history_model
+
+from .base import HistoryBackend, HistorySession
+
+
+class SQLiteHistorySession(HistorySession):
+    def start(self):
+        self.session_id = uuid.uuid4()
+        self.session_date = timezone.now()
+        # Make sure we have an open connection, and create the history functions.
+        self.backend.conn.ensure_connection()
+        self.backend.conn.connection.create_function(
+            "history_session_id", 0, lambda: str(self.session_id)
+        )
+        self.backend.conn.connection.create_function(
+            "history_session_date", 0, lambda: self.session_date.isoformat()
+        )
+        self.backend.conn.connection.create_function(
+            "history_session_user", 0, lambda: self.user_id
+        )
+
+    def stop(self):
+        self.backend.conn.ensure_connection()
+        self.backend.conn.connection.create_function(
+            "history_session_id", 0, lambda: None
+        )
+        self.backend.conn.connection.create_function(
+            "history_session_date", 0, lambda: None
+        )
+        self.backend.conn.connection.create_function(
+            "history_session_user", 0, lambda: None
+        )
 
 
 class SQLiteHistoryBackend(HistoryBackend):
-    supports_schemas = False
-
-    @property
-    def func_name(self):
-        return "get_" + conf.USER_VARIABLE.replace(".", "_")
-
-    def setup(self):
-        self.clear_user()
-
-    def set_user(self, user_id):
-        def current_user():
-            return user_id
-
-        self.conn.ensure_connection()
-        self.conn.connection.create_function(self.func_name, 0, current_user)
-
-    def get_user(self):
-        return self.execute("SELECT {func}()".format(func=self.func_name), fetch=True)[
-            0
-        ][0]
+    session_class = SQLiteHistorySession
 
     def _json_object(self, model, alias):
         """
@@ -34,6 +49,9 @@ class SQLiteHistoryBackend(HistoryBackend):
         parts = []
         for f in model._meta.get_fields(include_parents=False):
             if f.many_to_many or not f.concrete:
+                continue
+            if isinstance(f, models.BinaryField):
+                # TODO: fix this
                 continue
             parts.append("'{}'".format(f.column))
             parts.append("{}.{}".format(alias, self.conn.ops.quote_name(f.column)))
@@ -49,6 +67,9 @@ class SQLiteHistoryBackend(HistoryBackend):
         parts = []
         for f in model._meta.get_fields(include_parents=False):
             if f.many_to_many or not f.concrete:
+                continue
+            if isinstance(f, models.BinaryField):
+                # TODO: fix this
                 continue
             parts.append(
                 "json_array('{name}', OLD.{col}, NEW.{col})".format(
@@ -77,52 +98,51 @@ class SQLiteHistoryBackend(HistoryBackend):
             values=", ".join(parts)
         )
 
-    def create_schema(self):
-        pass
-
-    def drop_schema(self):
-        for model in self.get_models():
-            for trigger_type in TriggerType:
-                self.drop_trigger(model, trigger_type)
-            self.drop_history_table(model)
-
     def create_trigger(self, model, trigger_type):
+        HistoryModel = get_history_model()
+        user_col = HistoryModel._meta.get_field(HistoryModel.USER_FIELD).column
+        ct = ContentType.objects.get_for_model(model)
+        tr_name = self.trigger_name(model, trigger_type)
         self.drop_trigger(model, trigger_type)
         self.execute(
             """
             CREATE TRIGGER {trigger_name} AFTER {action} ON {table} BEGIN
                 INSERT INTO {history_table} (
+                    session_id,
+                    session_date,
+                    {user_col},
+                    change_type,
+                    content_type_id,
                     object_id,
                     snapshot,
-                    changes,
-                    {user_col},
-                    event_date,
-                    event_type
+                    changes
                 )
                 VALUES (
-                    {pk_ref}.{pk_name},
+                    history_session_id(),
+                    history_session_date(),
+                    history_session_user(),
+                    '{change_type}',
+                    {ctid},
+                    {pk_ref}.{pk_col},
                     {snapshot},
-                    {changes},
-                    {user_func}(),
-                    CURRENT_TIMESTAMP,
-                    '{type}'
+                    {changes}
                 );
             END;
             """.format(
-                trigger_name=self.trigger_name(model, trigger_type),
+                trigger_name=tr_name,
                 action=trigger_type.name,
                 table=model._meta.db_table,
-                history_table=self.history_table_name(model._meta.db_table),
-                user_col=self.user_column,
-                pk_name=model._meta.pk.column,
+                history_table=HistoryModel._meta.db_table,
+                user_col=user_col,
+                change_type=trigger_type.value,
+                ctid=ct.pk,
                 pk_ref=trigger_type.snapshot,
-                user_func=self.func_name,
+                pk_col=model._meta.pk.column,
                 snapshot=self._json_object(model, trigger_type.snapshot),
                 changes=self._json_changes(model) if trigger_type.changes else "NULL",
-                type=trigger_type.value,
             )
         )
-        return self.trigger_name(model, trigger_type)
+        return tr_name
 
     def drop_trigger(self, model, trigger_type):
         self.execute(

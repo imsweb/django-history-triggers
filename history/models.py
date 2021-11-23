@@ -1,17 +1,14 @@
-import logging
-
+from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from . import conf
-
-logger = logging.getLogger(__name__)
-
 
 class TriggerType(models.TextChoices):
-    INSERT = "+", _("Insert")
-    DELETE = "-", _("Delete")
-    UPDATE = "~", _("Update")
+    INSERT = "I", _("Insert")
+    DELETE = "D", _("Delete")
+    UPDATE = "U", _("Update")
 
     @property
     def snapshot(self):
@@ -22,21 +19,51 @@ class TriggerType(models.TextChoices):
         return self == TriggerType.UPDATE
 
 
-class HistoricalModel(models.Model):
+class AbstractObjectHistory(models.Model):
     id = models.BigAutoField(primary_key=True)
-    snapshot = models.JSONField(null=True, blank=True)
-    changes = models.JSONField(null=True, blank=True)
-    event_date = models.DateTimeField()
-    event_type = models.CharField(max_length=1, choices=TriggerType.choices)
+    session_id = models.UUIDField(editable=False)
+    session_date = models.DateTimeField(editable=False)
+    change_type = models.CharField(
+        max_length=1, choices=TriggerType.choices, editable=False
+    )
+    content_type = models.ForeignKey(
+        ContentType,
+        related_name="object_history",
+        on_delete=models.CASCADE,
+        editable=False,
+    )
+    object_id = models.BigIntegerField(editable=False)
+    snapshot = models.JSONField(null=True, blank=True, editable=False)
+    changes = models.JSONField(null=True, blank=True, editable=False)
+
+    source = GenericForeignKey("content_type", "object_id")
+
+    USER_FIELD = None
 
     class Meta:
         abstract = True
-
-    def save(self, **kwargs):
-        raise NotImplementedError()
-
-    def delete(self, **kwargs):
-        raise NotImplementedError()
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+        ]
 
     def get_user(self):
-        return getattr(self, conf.USER_FIELD)
+        return getattr(self, self.USER_FIELD)
+
+
+class ObjectHistory(AbstractObjectHistory):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        db_constraint=False,
+        related_name="object_history",
+        on_delete=models.DO_NOTHING,
+        editable=False,
+    )
+
+    USER_FIELD = "user"
+
+    class Meta(AbstractObjectHistory.Meta):
+        db_table = "object_history"
+        swappable = "HISTORY_MODEL"
+        verbose_name_plural = _("object history")
