@@ -3,8 +3,8 @@ import secrets
 
 
 # Fake getting the request's user for testing purposes.
-def test_request_user(request):
-    return "webuser"
+def test_request_context(request):
+    return {"username": "webuser"}
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -84,4 +84,4 @@ STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 HISTORY_MODEL = "testapp.CustomHistory"
-HISTORY_REQUEST_USER = test_request_user
+HISTORY_REQUEST_CONTEXT = test_request_context

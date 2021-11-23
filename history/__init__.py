@@ -7,12 +7,14 @@ __version_info__ = tuple(int(num) for num in __version__.split(".") if num.isdig
 
 def get_history_model():
     return apps.get_model(
-        getattr(settings, "HISTORY_MODEL", "history.ObjectHistory"), require_ready=False
+        getattr(settings, "HISTORY_MODEL", "history.ObjectHistory"),
+        require_ready=False,
     )
 
 
-def get_request_user(request):
+def get_request_context(request):
     try:
-        return request.user.pk
+        field = get_history_model().USER_FIELD
+        return {field: request.user} if field else {}
     except AttributeError:
-        return None
+        return {}

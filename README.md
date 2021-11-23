@@ -17,6 +17,7 @@ Settings
 ========
 
 * `HISTORY_MODEL` (default: `"history.ObjectHistory"`)
+* `HISTORY_IGNORE_APPS` (default: `["admin", "contenttypes", "sessions"]`)
 * `HISTORY_MIDDLEWARE_IGNORE` (default: `[]`)
-* `HISTORY_REQUEST_USER` (default: `"history.get_request_user"`)
+* `HISTORY_REQUEST_CONTEXT` (default: `"history.get_request_context"`)
 * `HISTORY_ADMIN_ENABLED` (default: `True`)

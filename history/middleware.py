@@ -11,10 +11,10 @@ class HistoryMiddleware:
 
     def __init__(self, get_response=None):
         self.get_response = get_response
-        self.get_user = (
-            conf.REQUEST_USER
-            if callable(conf.REQUEST_USER)
-            else import_string(conf.REQUEST_USER)
+        self.get_context = (
+            conf.REQUEST_CONTEXT
+            if callable(conf.REQUEST_CONTEXT)
+            else import_string(conf.REQUEST_CONTEXT)
         )
 
     def __call__(self, request):
@@ -23,5 +23,6 @@ class HistoryMiddleware:
                 return self.get_response(request)
 
         backend = backends.get_backend()
-        with backend.session(self.get_user(request)):
+        context = self.get_context(request) or {}
+        with backend.session(**context):
             return self.get_response(request)

@@ -47,7 +47,7 @@ class AbstractObjectHistory(models.Model):
         ]
 
     def get_user(self):
-        return getattr(self, self.USER_FIELD)
+        return getattr(self, self.USER_FIELD) if self.USER_FIELD else None
 
 
 class ObjectHistory(AbstractObjectHistory):

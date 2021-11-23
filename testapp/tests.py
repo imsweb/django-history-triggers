@@ -25,7 +25,7 @@ class TriggersTestCase(TestCase):
 
 class BasicTests(TriggersTestCase):
     def test_basics(self):
-        with self.backend.session("nobody"):
+        with self.backend.session(username="nobody"):
             dan = Author.objects.create(name="Dan Watson")
             alexa = Author.objects.create(name="Alexa Watson")
         self.assertEqual(HistoryModel.objects.count(), 2)
@@ -37,6 +37,13 @@ class BasicTests(TriggersTestCase):
         self.assertEqual(h1.session_date, h2.session_date)
         self.assertEqual(h1.get_user(), h2.get_user())
         self.assertEqual(h1.get_user(), "nobody")
+
+    def test_extra(self):
+        with self.backend.session(username="somebody", extra="special"):
+            author = Author.objects.create(name="Dan Watson")
+        h1 = author.history.get()
+        self.assertEqual(h1.get_user(), "somebody")
+        self.assertEqual(h1.extra, "special")
 
 
 class MiddlewareTests(TriggersTestCase):

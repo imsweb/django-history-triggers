@@ -61,6 +61,7 @@ class Migration(migrations.Migration):
                 ("snapshot", models.JSONField(blank=True, editable=False, null=True)),
                 ("changes", models.JSONField(blank=True, editable=False, null=True)),
                 ("username", models.TextField()),
+                ("extra", models.TextField(blank=True, null=True)),
                 (
                     "content_type",
                     models.ForeignKey(

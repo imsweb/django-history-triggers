@@ -1,8 +1,5 @@
-import uuid
-
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.utils import timezone
 
 from history import get_history_model
 
@@ -11,31 +8,25 @@ from .base import HistoryBackend, HistorySession
 
 class SQLiteHistorySession(HistorySession):
     def start(self):
-        self.session_id = uuid.uuid4()
-        self.session_date = timezone.now()
         # Make sure we have an open connection, and create the history functions.
         self.backend.conn.ensure_connection()
-        self.backend.conn.connection.create_function(
-            "history_session_id", 0, lambda: str(self.session_id)
-        )
-        self.backend.conn.connection.create_function(
-            "history_session_date", 0, lambda: self.session_date.isoformat()
-        )
-        self.backend.conn.connection.create_function(
-            "history_session_user", 0, lambda: self.user_id
-        )
+
+        # This is to bind "name" since it's in a loop.
+        def getter(name):
+            return lambda: self.fields.get(name)
+
+        # Create a function for every session field, named "history_{column}".
+        for field in self.backend.session_fields():
+            self.backend.conn.connection.create_function(
+                "history_{}".format(field.column), 0, getter(field.name)
+            )
 
     def stop(self):
         self.backend.conn.ensure_connection()
-        self.backend.conn.connection.create_function(
-            "history_session_id", 0, lambda: None
-        )
-        self.backend.conn.connection.create_function(
-            "history_session_date", 0, lambda: None
-        )
-        self.backend.conn.connection.create_function(
-            "history_session_user", 0, lambda: None
-        )
+        for field in self.backend.session_fields():
+            self.backend.conn.connection.create_function(
+                "history_{}".format(field.column), 0, lambda: None
+            )
 
 
 class SQLiteHistoryBackend(HistoryBackend):
@@ -100,32 +91,32 @@ class SQLiteHistoryBackend(HistoryBackend):
 
     def create_trigger(self, model, trigger_type):
         HistoryModel = get_history_model()
-        user_col = HistoryModel._meta.get_field(HistoryModel.USER_FIELD).column
         ct = ContentType.objects.get_for_model(model)
         tr_name = self.trigger_name(model, trigger_type)
+        session_cols = []
+        session_values = []
+        for field in self.session_fields():
+            session_cols.append(field.column)
+            session_values.append("history_{}()".format(field.column))
         self.drop_trigger(model, trigger_type)
         self.execute(
             """
             CREATE TRIGGER {trigger_name} AFTER {action} ON {table} BEGIN
                 INSERT INTO {history_table} (
-                    session_id,
-                    session_date,
-                    {user_col},
                     change_type,
                     content_type_id,
                     object_id,
                     snapshot,
-                    changes
+                    changes,
+                    {session_cols}
                 )
                 VALUES (
-                    history_session_id(),
-                    history_session_date(),
-                    history_session_user(),
                     '{change_type}',
                     {ctid},
                     {pk_ref}.{pk_col},
                     {snapshot},
-                    {changes}
+                    {changes},
+                    {session_values}
                 );
             END;
             """.format(
@@ -133,13 +124,14 @@ class SQLiteHistoryBackend(HistoryBackend):
                 action=trigger_type.name,
                 table=model._meta.db_table,
                 history_table=HistoryModel._meta.db_table,
-                user_col=user_col,
                 change_type=trigger_type.value,
                 ctid=ct.pk,
                 pk_ref=trigger_type.snapshot,
                 pk_col=model._meta.pk.column,
                 snapshot=self._json_object(model, trigger_type.snapshot),
                 changes=self._json_changes(model) if trigger_type.changes else "NULL",
+                session_cols=", ".join(session_cols),
+                session_values=", ".join(session_values),
             )
         )
         return tr_name

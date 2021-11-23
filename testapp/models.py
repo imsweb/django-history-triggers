@@ -6,6 +6,7 @@ from history.models import AbstractObjectHistory
 
 class CustomHistory(AbstractObjectHistory):
     username = models.TextField()
+    extra = models.TextField(null=True, blank=True)
 
     USER_FIELD = "username"
 

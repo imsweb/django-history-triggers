@@ -83,8 +83,9 @@ class ObjectHistoryAdmin(admin.ModelAdmin):
             "object_id",
             "snapshot_html",
             "changes_html",
-            HistoryModel.USER_FIELD,
         ]
+        if HistoryModel.USER_FIELD:
+            fields.append(HistoryModel.USER_FIELD)
         if obj and obj.change_type in ("I", "D"):
             fields.remove("changes_html")
         return fields
