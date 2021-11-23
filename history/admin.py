@@ -61,13 +61,17 @@ class ObjectHistoryAdmin(admin.ModelAdmin):
     ]
     list_filter = ["change_type", "content_type"]
 
-    @admin.display(description=_("Snapshot"))
+    # @admin.display(description=_("Snapshot"))
     def snapshot_html(self, obj):
         return format_json(obj.snapshot)
 
-    @admin.display(description=_("Changes"))
+    snapshot_html.short_description = _("Snapshot")
+
+    # @admin.display(description=_("Changes"))
     def changes_html(self, obj):
         return format_json(obj.changes, valsep=": ", arrsep=" &rarr; ")
+
+    changes_html.short_description = _("Changes")
 
     def get_readonly_fields(self, request, obj=None):
         fields = [
