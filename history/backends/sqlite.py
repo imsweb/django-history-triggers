@@ -6,6 +6,13 @@ from history import get_history_model
 from .base import HistoryBackend, HistorySession
 
 
+def column(field, ref):
+    if isinstance(field, models.BinaryField):
+        return "'\\x' || nullif(hex({}.{}), '')".format(ref, field.column)
+    else:
+        return "{}.{}".format(ref, field.column)
+
+
 class SQLiteHistorySession(HistorySession):
     def start(self):
         # Make sure we have an open connection, and create the history functions.
@@ -41,11 +48,8 @@ class SQLiteHistoryBackend(HistoryBackend):
         for f in model._meta.get_fields(include_parents=False):
             if f.many_to_many or not f.concrete:
                 continue
-            if isinstance(f, models.BinaryField):
-                # TODO: fix this
-                continue
             parts.append("'{}'".format(f.column))
-            parts.append("{}.{}".format(alias, self.conn.ops.quote_name(f.column)))
+            parts.append(column(f, alias))
         return "json_object({})".format(", ".join(parts))
 
     def _json_changes(self, model):
@@ -59,13 +63,11 @@ class SQLiteHistoryBackend(HistoryBackend):
         for f in model._meta.get_fields(include_parents=False):
             if f.many_to_many or not f.concrete:
                 continue
-            if isinstance(f, models.BinaryField):
-                # TODO: fix this
-                continue
             parts.append(
-                "json_array('{name}', OLD.{col}, NEW.{col})".format(
+                "json_array('{name}', {old}, {new})".format(
                     name=f.column,
-                    col=self.conn.ops.quote_name(f.column),
+                    old=column(f, "OLD"),
+                    new=column(f, "NEW"),
                 )
             )
         # Largely taken from:

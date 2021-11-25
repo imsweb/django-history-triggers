@@ -4,6 +4,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from .utils import get_history_model
+
 
 class TriggerType(models.TextChoices):
     INSERT = "I", _("Insert")
@@ -28,7 +30,7 @@ class AbstractObjectHistory(models.Model):
     )
     content_type = models.ForeignKey(
         ContentType,
-        related_name="object_history",
+        related_name="+",
         on_delete=models.CASCADE,
         editable=False,
     )
@@ -67,3 +69,10 @@ class ObjectHistory(AbstractObjectHistory):
         db_table = "object_history"
         swappable = "HISTORY_MODEL"
         verbose_name_plural = _("object history")
+
+
+class HistoryMixIn:
+    @property
+    def history(self):
+        ct = ContentType.objects.get_for_model(self)
+        return get_history_model().objects.filter(content_type=ct, object_id=self.pk)

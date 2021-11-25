@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         editable=False,
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name="object_history",
+                        related_name="+",
                         to="contenttypes.contenttype",
                     ),
                 ),

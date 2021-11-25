@@ -1,9 +1,14 @@
+import binascii
+import os
+
 from django.core.management import call_command
+from django.db.utils import DatabaseError
 from django.test import TestCase
 
 from history import backends, get_history_model
+from history.models import TriggerType
 
-from .models import Author
+from .models import Author, CustomHistory
 
 HistoryModel = get_history_model()
 
@@ -25,18 +30,68 @@ class TriggersTestCase(TestCase):
 
 class BasicTests(TriggersTestCase):
     def test_basics(self):
-        with self.backend.session(username="nobody"):
-            dan = Author.objects.create(name="Dan Watson")
-            alexa = Author.objects.create(name="Alexa Watson")
-        self.assertEqual(HistoryModel.objects.count(), 2)
-        self.assertEqual(dan.history.count(), 1)
-        self.assertEqual(alexa.history.count(), 1)
-        h1 = dan.history.get()
-        h2 = alexa.history.get()
-        self.assertEqual(h1.session_id, h2.session_id)
-        self.assertEqual(h1.session_date, h2.session_date)
-        self.assertEqual(h1.get_user(), h2.get_user())
-        self.assertEqual(h1.get_user(), "nobody")
+        with self.backend.session(username="nobody") as session:
+            a = Author.objects.create(name="Nobody")
+            pk = a.pk
+            a.name = "Somebody"
+            a.save()
+            a.delete()
+        self.assertEqual(session.history.count(), 3)
+        insert = session.history.get(change_type=TriggerType.INSERT)
+        update = session.history.get(change_type=TriggerType.UPDATE)
+        delete = session.history.get(change_type=TriggerType.DELETE)
+        # Check insert history.
+        self.assertIs(insert.__class__, CustomHistory)
+        self.assertEqual(insert.session_id, session.session_id)
+        self.assertEqual(insert.get_user(), "nobody")
+        self.assertEqual(insert.snapshot, {"id": pk, "name": "Nobody", "picture": None})
+        self.assertIsNone(insert.changes)
+        # Check update history.
+        self.assertEqual(update.session_id, session.session_id)
+        self.assertEqual(update.get_user(), "nobody")
+        self.assertEqual(
+            update.snapshot, {"id": pk, "name": "Somebody", "picture": None}
+        )
+        self.assertEqual(update.changes, {"name": ["Nobody", "Somebody"]})
+        # Check delete history.
+        self.assertEqual(delete.session_id, session.session_id)
+        self.assertEqual(delete.get_user(), "nobody")
+        self.assertEqual(
+            delete.snapshot, {"id": pk, "name": "Somebody", "picture": None}
+        )
+        self.assertIsNone(delete.changes)
+
+    def test_no_session(self):
+        with self.assertRaises(DatabaseError):
+            Author.objects.create(name="Error")
+
+    def test_binary_data(self):
+        old_data = os.urandom(1024)
+        new_data = os.urandom(1024)
+        with self.backend.session(username="nobody") as session:
+            dan = Author.objects.create(name="Dan Watson", picture=old_data)
+            dan.picture = new_data
+            dan.save()
+        self.assertEqual(session.history.count(), 2)
+        self.assertEqual(dan.history.count(), 2)
+        insert = session.history.get(change_type=TriggerType.INSERT)
+        self.assertTrue(insert.snapshot["picture"].startswith("\\x"))
+        self.assertEqual(binascii.unhexlify(insert.snapshot["picture"][2:]), old_data)
+        update = session.history.get(change_type=TriggerType.UPDATE)
+        self.assertTrue(update.snapshot["picture"].startswith("\\x"))
+        self.assertEqual(binascii.unhexlify(update.snapshot["picture"][2:]), new_data)
+        self.assertIn("picture", update.changes)
+        old_hex, new_hex = update.changes["picture"]
+        self.assertTrue(old_hex.startswith("\\x"))
+        self.assertEqual(binascii.unhexlify(old_hex[2:]), old_data)
+        self.assertTrue(new_hex.startswith("\\x"))
+        self.assertEqual(binascii.unhexlify(new_hex[2:]), new_data)
+        with self.backend.session(username="nobody") as session:
+            dan.delete()
+        self.assertEqual(session.history.count(), 1)
+        delete = session.history.get()
+        self.assertTrue(delete.snapshot["picture"].startswith("\\x"))
+        self.assertEqual(binascii.unhexlify(delete.snapshot["picture"][2:]), new_data)
 
     def test_extra(self):
         with self.backend.session(username="somebody", extra="special"):

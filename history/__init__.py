@@ -1,20 +1,4 @@
-from django.apps import apps
-from django.conf import settings
+from .utils import get_history_model, get_request_context  # noqa
 
 __version__ = "3.0.0"
 __version_info__ = tuple(int(num) for num in __version__.split(".") if num.isdigit())
-
-
-def get_history_model():
-    return apps.get_model(
-        getattr(settings, "HISTORY_MODEL", "history.ObjectHistory"),
-        require_ready=False,
-    )
-
-
-def get_request_context(request):
-    try:
-        field = get_history_model().USER_FIELD
-        return {field: request.user} if field else {}
-    except AttributeError:
-        return {}

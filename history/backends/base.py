@@ -18,10 +18,20 @@ class HistorySession:
             value = fields.get(field.name)
             if isinstance(value, models.Model):
                 value = value.pk
+            elif isinstance(value, uuid.UUID):
+                value = value.hex
             if value is not None:
                 self.fields[field.name] = value
-        self.fields.setdefault("session_id", str(uuid.uuid4()))
+        self.fields.setdefault("session_id", uuid.uuid4().hex)
         self.fields.setdefault("session_date", timezone.now().isoformat())
+
+    @property
+    def session_id(self):
+        return uuid.UUID(self.fields["session_id"])
+
+    @property
+    def history(self):
+        return get_history_model().objects.filter(session_id=self.session_id)
 
     def start(self):
         raise NotImplementedError()
@@ -30,7 +40,8 @@ class HistorySession:
         raise NotImplementedError()
 
     def __enter__(self):
-        return self.start()
+        self.start()
+        return self
 
     def __exit__(self, *exc_details):
         self.stop()

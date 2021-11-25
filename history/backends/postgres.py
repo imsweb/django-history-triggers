@@ -16,7 +16,7 @@ TRIGGER_FUNCTION_SQL = """
         IF (TG_OP = 'UPDATE') THEN
             SELECT
                 jsonb_object_agg(
-                    coalesce(o.key, n.key),
+                    coalesce(n.key, o.key),
                     jsonb_build_array(o.value, n.value)
                 ) INTO _changes
             FROM
@@ -37,13 +37,13 @@ TRIGGER_FUNCTION_SQL = """
         VALUES (
             substr(TG_OP, 1, 1),
             _ctid,
-            coalesce(_old->>_pk_name, _new->>_pk_name)::{obj_type},
-            to_jsonb(coalesce(NEW, OLD)),
+            coalesce(_new->>_pk_name, _old->>_pk_name)::{obj_type},
+            coalesce(_new, _old),
             _changes,
             {session_values}
         );
 
-        RETURN coalesce(NEW, OLD);
+        RETURN NULL;
     END; $BODY$
     LANGUAGE 'plpgsql' VOLATILE;
 """
