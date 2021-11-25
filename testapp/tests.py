@@ -2,7 +2,7 @@ import binascii
 import os
 
 from django.core.management import call_command
-from django.db.utils import DatabaseError
+from django.db.utils import IntegrityError
 from django.test import TestCase
 
 from history import backends, get_history_model
@@ -62,7 +62,7 @@ class BasicTests(TriggersTestCase):
         self.assertIsNone(delete.changes)
 
     def test_no_session(self):
-        with self.assertRaises(DatabaseError):
+        with self.assertRaises(IntegrityError):
             Author.objects.create(name="Error")
 
     def test_binary_data(self):

@@ -77,7 +77,7 @@ class PostgresHistoryBackend(HistoryBackend):
         for field in self.session_fields():
             session_cols.append(field.column)
             session_values.append(
-                "current_setting('history.{field}', true)::{type}".format(
+                "nullif(current_setting('history.{field}', true), '')::{type}".format(
                     field=field.name,
                     type=field.rel_db_type(self.conn),
                 )
