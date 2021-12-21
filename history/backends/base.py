@@ -1,7 +1,6 @@
 import uuid
 
 from django.apps import apps
-from django.db import models
 from django.db.backends.utils import split_identifier, truncate_name
 from django.utils import timezone
 
@@ -16,7 +15,8 @@ class HistorySession:
         # Sanitize based on session fields in the object history model.
         for field in backend.session_fields():
             value = fields.get(field.name)
-            if isinstance(value, models.Model):
+            if hasattr(value, "pk"):
+                # This also covers AnonymousUser, which is not a Model instance.
                 value = value.pk
             elif isinstance(value, uuid.UUID):
                 value = value.hex

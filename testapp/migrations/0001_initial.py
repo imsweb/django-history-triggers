@@ -77,6 +77,7 @@ class Migration(migrations.Migration):
                 ),
                 ("title", models.CharField(max_length=100)),
                 ("year", models.IntegerField(blank=True, null=True)),
+                ("order", models.IntegerField(default=0)),
                 (
                     "authors",
                     models.ManyToManyField(related_name="books", to="testapp.Author"),

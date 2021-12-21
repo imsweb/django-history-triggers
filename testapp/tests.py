@@ -8,7 +8,7 @@ from django.test import TestCase
 from history import backends, get_history_model
 from history.models import TriggerType
 
-from .models import Author, CustomHistory
+from .models import Author, Book, CustomHistory
 
 HistoryModel = get_history_model()
 
@@ -99,6 +99,14 @@ class BasicTests(TriggersTestCase):
         h1 = author.history.get()
         self.assertEqual(h1.get_user(), "somebody")
         self.assertEqual(h1.extra, "special")
+
+    def test_reserved_name(self):
+        with self.backend.session(username="somebody"):
+            book = Book.objects.create(title="Some Book", order=1)
+            book.year = 1981
+            book.order = 2
+            book.save()
+        self.assertEqual(book.history.count(), 2)
 
 
 class MiddlewareTests(TriggersTestCase):

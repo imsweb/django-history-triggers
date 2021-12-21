@@ -22,3 +22,4 @@ class Book(models.Model, HistoryMixIn):
     title = models.CharField(max_length=100)
     authors = models.ManyToManyField(Author, related_name="books")
     year = models.IntegerField(null=True, blank=True)
+    order = models.IntegerField(default=0)

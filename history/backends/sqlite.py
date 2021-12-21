@@ -8,9 +8,9 @@ from .base import HistoryBackend, HistorySession
 
 def column(field, ref):
     if isinstance(field, models.BinaryField):
-        return "'\\x' || nullif(hex({}.{}), '')".format(ref, field.column)
+        return "'\\x' || nullif(hex({}.\"{}\"), '')".format(ref, field.column)
     else:
-        return "{}.{}".format(ref, field.column)
+        return '{}."{}"'.format(ref, field.column)
 
 
 class SQLiteHistorySession(HistorySession):
@@ -98,7 +98,7 @@ class SQLiteHistoryBackend(HistoryBackend):
         session_cols = []
         session_values = []
         for field in self.session_fields():
-            session_cols.append(field.column)
+            session_cols.append('"' + field.column + '"')
             session_values.append("history_{}()".format(field.column))
         self.drop_trigger(model, trigger_type)
         self.execute(
