@@ -59,6 +59,9 @@ class HistoryBackend:
     def remove(self):
         pass
 
+    def clear(self):
+        get_history_model().objects.all().delete()
+
     def get_models(self):
         return [
             model

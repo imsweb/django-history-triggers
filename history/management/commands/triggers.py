@@ -7,11 +7,14 @@ from history.models import TriggerType
 class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("-q", "--quiet", action="store_true")
+        parser.add_argument("--clear", action="store_true")
         subs = parser.add_subparsers(dest="action")
         subs.add_parser("enable")
         subs.add_parser("disable")
 
     def handle_enable(self, backend, **options):
+        if options["clear"]:
+            backend.clear()
         backend.install()
         for model in backend.get_models():
             if not options["quiet"]:
@@ -28,6 +31,8 @@ class Command(BaseCommand):
             for trigger_type in TriggerType:
                 backend.drop_trigger(model, trigger_type)
         backend.remove()
+        if options["clear"]:
+            backend.clear()
 
     def handle(self, **options):
         backend = backends.get_backend()
