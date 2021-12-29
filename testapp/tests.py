@@ -65,6 +65,20 @@ class BasicTests(TriggersTestCase):
         with self.assertRaises(IntegrityError):
             Author.objects.create(name="Error")
 
+    def test_nested_sessions(self):
+        with self.backend.session(username="first") as s1:
+            Author.objects.create(name="First")
+            with self.backend.session(username="second") as s2:
+                Author.objects.create(name="Second")
+            Author.objects.create(name="Third")
+        self.assertEqual(Author.history.count(), 3)
+        self.assertEqual(s1.history.count(), 2)
+        self.assertEqual(s2.history.count(), 1)
+        for h in s1.history:
+            self.assertEqual(h.get_user(), "first")
+        for h in s2.history:
+            self.assertEqual(h.get_user(), "second")
+
     def test_binary_data(self):
         old_data = os.urandom(1024)
         new_data = os.urandom(1024)

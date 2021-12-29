@@ -51,6 +51,15 @@ class AbstractObjectHistory(models.Model):
     def get_user(self):
         return getattr(self, self.USER_FIELD) if self.USER_FIELD else None
 
+    def __str__(self):
+        # Use the ContentType cache instead of FK lookups every time.
+        ct = ContentType.objects.get_for_id(self.content_type_id)
+        return "{} {}({})".format(
+            self.get_change_type_display(),
+            ct.model_class()._meta.label,
+            self.object_id,
+        )
+
 
 class ObjectHistory(AbstractObjectHistory):
     user = models.ForeignKey(
@@ -71,8 +80,14 @@ class ObjectHistory(AbstractObjectHistory):
         verbose_name_plural = _("object history")
 
 
+class HistoryDescriptor:
+    def __get__(self, instance, owner=None):
+        ct = ContentType.objects.get_for_model(instance or owner)
+        qs = get_history_model().objects.filter(content_type=ct)
+        if instance:
+            qs = qs.filter(object_id=instance.pk)
+        return qs
+
+
 class HistoryMixIn:
-    @property
-    def history(self):
-        ct = ContentType.objects.get_for_model(self)
-        return get_history_model().objects.filter(content_type=ct, object_id=self.pk)
+    history = HistoryDescriptor()

@@ -94,6 +94,10 @@ class PostgresHistoryBackend(HistoryBackend):
     def remove(self):
         self.execute("DROP FUNCTION IF EXISTS history_record();")
 
+    def clear(self):
+        HistoryModel = get_history_model()
+        self.execute("TRUNCATE {table};".format(table=HistoryModel._meta.db_table))
+
     def create_trigger(self, model, trigger_type):
         ct = ContentType.objects.get_for_model(model)
         tr_name = self.trigger_name(model, trigger_type)

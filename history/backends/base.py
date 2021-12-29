@@ -11,6 +11,7 @@ from history.models import AbstractObjectHistory
 class HistorySession:
     def __init__(self, backend, **fields):
         self.backend = backend
+        self.parent = None
         self.fields = {}
         # Sanitize based on session fields in the object history model.
         for field in backend.session_fields():
@@ -40,11 +41,17 @@ class HistorySession:
         raise NotImplementedError()
 
     def __enter__(self):
+        self.parent = self.backend.current_session
+        self.backend.current_session = self
         self.start()
         return self
 
     def __exit__(self, *exc_details):
         self.stop()
+        if self.parent:
+            # Restart the parent session that we were nested within.
+            self.parent.start()
+        self.backend.current_session = self.parent
 
 
 class HistoryBackend:
@@ -52,6 +59,7 @@ class HistoryBackend:
 
     def __init__(self, connection):
         self.conn = connection
+        self.current_session = None
 
     def install(self):
         pass
