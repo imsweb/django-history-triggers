@@ -15,9 +15,6 @@ def column(field, ref):
 
 class SQLiteHistorySession(HistorySession):
     def start(self):
-        # Make sure we have an open connection, and create the history functions.
-        self.backend.conn.ensure_connection()
-
         # This is to bind "name" since it's in a loop.
         def getter(name):
             return lambda: self.fields.get(name)
@@ -29,7 +26,6 @@ class SQLiteHistorySession(HistorySession):
             )
 
     def stop(self):
-        self.backend.conn.ensure_connection()
         for field in self.backend.session_fields():
             self.backend.conn.connection.create_function(
                 "history_{}".format(field.column), 0, lambda: None

@@ -29,6 +29,11 @@ class TriggersTestCase(TestCase):
 
 
 class BasicTests(TriggersTestCase):
+    def test_backend_cache(self):
+        b1 = backends.get_backend()
+        b2 = backends.get_backend()
+        self.assertIs(b1, b2)
+
     def test_basics(self):
         with self.backend.session(username="nobody") as session:
             a = Author.objects.create(name="Nobody")

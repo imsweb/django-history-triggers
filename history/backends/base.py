@@ -1,6 +1,7 @@
 import uuid
 
 from django.apps import apps
+from django.db import connections
 from django.db.backends.utils import split_identifier, truncate_name
 from django.utils import timezone
 
@@ -57,9 +58,15 @@ class HistorySession:
 class HistoryBackend:
     session_class = HistorySession
 
-    def __init__(self, connection):
-        self.conn = connection
+    def __init__(self, alias):
+        self.alias = alias
         self.current_session = None
+
+    @property
+    def conn(self):
+        c = connections[self.alias]
+        c.ensure_connection()
+        return c
 
     def install(self):
         pass
