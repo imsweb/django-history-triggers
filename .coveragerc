@@ -1,0 +1,5 @@
+[run]
+source = history
+omit =
+    manage.py
+    history/admin.py

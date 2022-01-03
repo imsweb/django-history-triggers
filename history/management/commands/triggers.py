@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.db import DEFAULT_DB_ALIAS
 
 from history import backends
 from history.models import TriggerType
@@ -6,8 +7,23 @@ from history.models import TriggerType
 
 class Command(BaseCommand):
     def add_arguments(self, parser):
-        parser.add_argument("-q", "--quiet", action="store_true")
-        parser.add_argument("--clear", action="store_true")
+        parser.add_argument(
+            "-q",
+            "--quiet",
+            action="store_true",
+            help="Suppresses all output.",
+        )
+        parser.add_argument(
+            "-d",
+            "--database",
+            default=DEFAULT_DB_ALIAS,
+            help="Which database to operate on. Defaults to `default`.",
+        )
+        parser.add_argument(
+            "--clear",
+            action="store_true",
+            help="Clears all object history.",
+        )
         subs = parser.add_subparsers(dest="action")
         subs.add_parser("enable")
         subs.add_parser("disable")
@@ -35,6 +51,6 @@ class Command(BaseCommand):
             backend.clear()
 
     def handle(self, **options):
-        backend = backends.get_backend()
+        backend = backends.get_backend(options["database"])
         action = options.get("action") or "enable"
         getattr(self, "handle_{}".format(action))(backend, **options)

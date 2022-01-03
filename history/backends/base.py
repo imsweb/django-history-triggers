@@ -35,10 +35,10 @@ class HistorySession:
     def history(self):
         return get_history_model().objects.filter(session_id=self.session_id)
 
-    def start(self):
+    def start(self):  # pragma: no cover
         raise NotImplementedError()
 
-    def stop(self):
+    def stop(self):  # pragma: no cover
         raise NotImplementedError()
 
     def __enter__(self):
@@ -99,15 +99,9 @@ class HistoryBackend:
             if f.concrete and f.name not in auto_populated:
                 yield f
 
-    def execute(self, sql, params=None, fetch=False):
+    def execute(self, sql, params=None):
         with self.conn.cursor() as cursor:
-            if isinstance(sql, str):
-                cursor.execute(sql, params)
-            else:
-                for stmt in sql:
-                    cursor.execute(stmt, params)
-            if fetch:
-                return cursor.fetchall()
+            cursor.execute(sql, params)
 
     def session(self, **fields):
         return self.session_class(self, **fields)
@@ -119,7 +113,7 @@ class HistoryBackend:
         )
 
     def create_trigger(self, model, trigger_type):
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def drop_trigger(self, model, trigger_type):
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover

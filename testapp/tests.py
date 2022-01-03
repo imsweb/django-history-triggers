@@ -7,6 +7,7 @@ from django.test import TestCase
 
 from history import backends, get_history_model
 from history.models import TriggerType
+from history.templatetags.history import json_format
 
 from .models import Author, Book, CustomHistory
 
@@ -22,7 +23,7 @@ class TriggersTestCase(TestCase):
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
-        call_command("triggers", "--quiet", "disable")
+        call_command("triggers", "--clear", "--quiet", "disable")
 
     def setUp(self):
         self.backend = backends.get_backend()
@@ -134,3 +135,13 @@ class MiddlewareTests(TriggersTestCase):
         self.assertEqual(HistoryModel.objects.count(), 1)
         insert = HistoryModel.objects.get()
         self.assertEqual(insert.get_user(), "webuser")
+
+
+class TemplateTagTests(TestCase):
+    def test_json_format(self):
+        self.assertEqual(json_format(None), "")
+        self.assertEqual(json_format(42), 42)
+        self.assertEqual(
+            json_format({"name": "Dan", "address": "123 Main St."}),
+            "address = 123 Main St.<br />name = Dan",
+        )
