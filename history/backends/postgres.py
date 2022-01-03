@@ -102,9 +102,14 @@ class PostgresHistoryBackend(HistoryBackend):
         ct = ContentType.objects.get_for_model(model)
         tr_name = self.trigger_name(model, trigger_type)
         self.execute(
+            "DROP TRIGGER IF EXISTS {tr_name} ON {table};".format(
+                tr_name=tr_name,
+                table=model._meta.db_table,
+            )
+        )
+        self.execute(
             """
-            CREATE OR REPLACE TRIGGER {tr_name}
-                AFTER {trans_type} ON {table}
+                CREATE TRIGGER {tr_name} AFTER {trans_type} ON {table}
                 FOR EACH ROW EXECUTE PROCEDURE history_record({ctid}, '{pk_col}');
             """.format(
                 tr_name=tr_name,
