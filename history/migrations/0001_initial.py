@@ -59,6 +59,7 @@ class Migration(migrations.Migration):
                 "db_table": "object_history",
                 "abstract": False,
                 "swappable": "HISTORY_MODEL",
+                "get_latest_by": ["session_date", "id"],
             },
         ),
         migrations.AddIndex(

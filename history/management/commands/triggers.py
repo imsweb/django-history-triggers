@@ -36,9 +36,11 @@ class Command(BaseCommand):
             if not options["quiet"]:
                 print("Creating triggers for {}".format(model._meta.label))
             for trigger_type in TriggerType:
-                name = backend.create_trigger(model, trigger_type)
+                name, fields = backend.create_trigger(model, trigger_type)
                 if options["verbosity"] > 1 and not options["quiet"]:
-                    print("  + {}".format(name))
+                    print("  + {}{}".format(name, "" if fields else " (SKIPPED)"))
+                    if options["verbosity"] > 2 and not options["quiet"]:
+                        print("    - {}".format(", ".join(fields)))
 
     def handle_disable(self, backend, **options):
         for model in backend.get_models():
@@ -51,6 +53,6 @@ class Command(BaseCommand):
             backend.clear()
 
     def handle(self, **options):
-        backend = backends.get_backend(options["database"])
+        backend = backends.get_backend(options["database"], cache=False)
         action = options.get("action") or "enable"
         getattr(self, "handle_{}".format(action))(backend, **options)

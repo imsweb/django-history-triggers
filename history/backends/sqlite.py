@@ -1,14 +1,18 @@
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
-from history import get_history_model
+from history import conf, get_history_model
 
 from .base import HistoryBackend, HistorySession
 
 
 def column(field, ref):
     if isinstance(field, models.BinaryField):
+        # Match the way Postgres converts bytea to a JSON string.
         return "'\\x' || nullif(hex({}.\"{}\"), '')".format(ref, field.column)
+    elif isinstance(field, models.JSONField):
+        # Explicitly call json so SQLite won't force it to a string.
+        return 'json({}."{}")'.format(ref, field.column)
     else:
         return '{}."{}"'.format(ref, field.column)
 
@@ -35,30 +39,30 @@ class SQLiteHistorySession(HistorySession):
 class SQLiteHistoryBackend(HistoryBackend):
     session_class = SQLiteHistorySession
 
-    def _json_object(self, model, alias):
+    def _json_object(self, fields, trigger_type):
         """
-        Returns an SQL fragment that builds a JSON object from all database fields
-        defined on `model`.
+        Returns an SQL fragment that builds a JSON object from the specified model
+        fields.
         """
+        if not conf.SNAPSHOTS or not trigger_type.snapshot:
+            return "NULL"
         parts = []
-        for f in model._meta.get_fields(include_parents=False):
-            if f.many_to_many or not f.concrete:
-                continue
+        for f in fields:
             parts.append("'{}'".format(f.column))
-            parts.append(column(f, alias))
+            parts.append(column(f, "NEW"))
         return "json_object({})".format(", ".join(parts))
 
-    def _json_changes(self, model):
+    def _json_changes(self, fields, trigger_type):
         """
         Returns a sub-select that generates a JSON object of changed fields between OLD
         and NEW, in the format:
 
             `{"field": [oldval, newval]}`
         """
+        if not trigger_type.changes:
+            return "NULL"
         parts = []
-        for f in model._meta.get_fields(include_parents=False):
-            if f.many_to_many or not f.concrete:
-                continue
+        for f in fields:
             parts.append(
                 "json_array('{name}', {old}, {new})".format(
                     name=f.column,
@@ -97,6 +101,9 @@ class SQLiteHistoryBackend(HistoryBackend):
             session_cols.append('"' + field.column + '"')
             session_values.append("history_{}()".format(field.column))
         self.drop_trigger(model, trigger_type)
+        fields = list(self.model_fields(model, trigger_type))
+        if not fields:
+            return tr_name, []
         self.execute(
             """
             CREATE TRIGGER {trigger_name} AFTER {action} ON {table} BEGIN
@@ -124,15 +131,15 @@ class SQLiteHistoryBackend(HistoryBackend):
                 history_table=HistoryModel._meta.db_table,
                 change_type=trigger_type.value,
                 ctid=ct.pk,
-                pk_ref=trigger_type.snapshot,
+                pk_ref=trigger_type.pk_alias,
                 pk_col=model._meta.pk.column,
-                snapshot=self._json_object(model, trigger_type.snapshot),
-                changes=self._json_changes(model) if trigger_type.changes else "NULL",
+                snapshot=self._json_object(fields, trigger_type),
+                changes=self._json_changes(fields, trigger_type),
                 session_cols=", ".join(session_cols),
                 session_values=", ".join(session_values),
             )
         )
-        return tr_name
+        return tr_name, [f.column for f in fields]
 
     def drop_trigger(self, model, trigger_type):
         self.execute(

@@ -29,7 +29,8 @@ that automatically record inserts, updates, and deletes to model tables.
 * `HISTORY_MODEL` (default: `"history.ObjectHistory"`)
 * `HISTORY_IGNORE_APPS` (default: `["admin", "contenttypes", "sessions"]`)
 * `HISTORY_MIDDLEWARE_IGNORE` (default: `[]`)
-* `HISTORY_REQUEST_CONTEXT` (default: `"history.get_request_context"`)
+* `HISTORY_FILTER` (default: `"history.utils.default_filter"`)
+* `HISTORY_REQUEST_CONTEXT` (default: `"history.utils.get_request_context"`)
 * `HISTORY_ADMIN_ENABLED` (default: `True`)
 
 
@@ -57,3 +58,38 @@ setting. If you need to define your own object history model (usually for tracki
 custom fields or non-standard user info), be sure to inherit from
 `history.models.AbstractObjectHistory`. If at all possible, do this early on to avoid
 problems with migrations when changing `HISTORY_MODEL` after the initial migration.
+
+
+## Filtering History
+
+The `HISTORY_FILTER` setting allows you to fully customize which fields (or even whole
+models) should be included in or excluded from history. It is implemented as a callable
+that takes three parameters:
+
+* The `django.db.models.Model` class being filtered
+* The `django.db.models.fields.Field` instance in question
+* The `history.models.TriggerType` being created
+
+The filter should return `True` if the field should be included, and `False` if it
+should be excluded. The default implementation (`history.utils.default_filter`) simply
+includes any field except `BinaryField`s:
+
+```python
+def default_filter(model, field, trigger_type):
+    return not isinstance(field, models.BinaryField)
+```
+
+Returning `False` for all fields of any given model has the effect of not tracking
+history for that model:
+
+```python
+def filter_sensitive(model, field, trigger_type):
+    return not issubclass(model, SensitiveDataModel)
+```
+
+Similarly, if you (for example) only wanted to record history for UPDATE statements:
+
+```python
+def updates_only(model, field, trigger_type):
+    return trigger_type == TriggerType.UPDATE
+```

@@ -4,6 +4,7 @@ from django.apps import apps
 from django.db import connections
 from django.db.backends.utils import split_identifier, truncate_name
 from django.utils import timezone
+from django.utils.module_loading import import_string
 
 from history import conf, get_history_model
 from history.models import AbstractObjectHistory
@@ -61,6 +62,9 @@ class HistoryBackend:
     def __init__(self, alias):
         self.alias = alias
         self.current_session = None
+        self.filter = (
+            conf.FILTER if callable(conf.FILTER) else import_string(conf.FILTER)
+        )
 
     @property
     def conn(self):
@@ -97,6 +101,13 @@ class HistoryBackend:
         ]
         for f in HistoryModel._meta.get_fields():
             if f.concrete and f.name not in auto_populated:
+                yield f
+
+    def model_fields(self, model, trigger_type):
+        for f in model._meta.get_fields(include_parents=False):
+            if f.many_to_many or not f.concrete:
+                continue
+            if self.filter(model, f, trigger_type):
                 yield f
 
     def execute(self, sql, params=None):

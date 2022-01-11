@@ -1,32 +1,45 @@
 import binascii
 import os
+import uuid
 
 from django.core.management import call_command
 from django.db.utils import IntegrityError
 from django.test import TestCase
+from django.test.utils import override_settings
+from django.utils import timezone
 
 from history import backends, get_history_model
 from history.models import TriggerType
 from history.templatetags.history import json_format
 
-from .models import Author, Book, CustomHistory
+from .models import Author, Book, CustomHistory, RandomData
 
 HistoryModel = get_history_model()
+
+
+def nofilter(model, field, trigger):
+    return True
+
+
+def replace(d, **kwargs):
+    new_dict = d.copy()
+    new_dict.update(kwargs)
+    return new_dict
 
 
 class TriggersTestCase(TestCase):
     @classmethod
     def setUpClass(cls):
-        call_command("triggers", "--quiet", "enable")
         super().setUpClass()
+        call_command("triggers", "--quiet", "enable")
 
     @classmethod
     def tearDownClass(cls):
-        super().tearDownClass()
         call_command("triggers", "--clear", "--quiet", "disable")
+        super().tearDownClass()
 
     def setUp(self):
-        self.backend = backends.get_backend()
+        self.backend = backends.get_backend(cache=False)
 
 
 class BasicTests(TriggersTestCase):
@@ -40,6 +53,7 @@ class BasicTests(TriggersTestCase):
             a = Author.objects.create(name="Nobody")
             pk = a.pk
             a.name = "Somebody"
+            a.picture = os.urandom(128)
             a.save()
             a.delete()
         self.assertEqual(session.history.count(), 3)
@@ -50,21 +64,17 @@ class BasicTests(TriggersTestCase):
         self.assertIs(insert.__class__, CustomHistory)
         self.assertEqual(insert.session_id, session.session_id)
         self.assertEqual(insert.get_user(), "nobody")
-        self.assertEqual(insert.snapshot, {"id": pk, "name": "Nobody", "picture": None})
+        self.assertEqual(insert.snapshot, {"id": pk, "name": "Nobody"})
         self.assertIsNone(insert.changes)
         # Check update history.
         self.assertEqual(update.session_id, session.session_id)
         self.assertEqual(update.get_user(), "nobody")
-        self.assertEqual(
-            update.snapshot, {"id": pk, "name": "Somebody", "picture": None}
-        )
+        self.assertEqual(update.snapshot, {"id": pk, "name": "Somebody"})
         self.assertEqual(update.changes, {"name": ["Nobody", "Somebody"]})
         # Check delete history.
         self.assertEqual(delete.session_id, session.session_id)
         self.assertEqual(delete.get_user(), "nobody")
-        self.assertEqual(
-            delete.snapshot, {"id": pk, "name": "Somebody", "picture": None}
-        )
+        self.assertIsNone(delete.snapshot)
         self.assertIsNone(delete.changes)
 
     def test_no_session(self):
@@ -85,6 +95,82 @@ class BasicTests(TriggersTestCase):
         for h in s2.history:
             self.assertEqual(h.get_user(), "second")
 
+    def test_extra(self):
+        with self.backend.session(username="somebody", extra="special"):
+            author = Author.objects.create(name="Dan Watson")
+        h1 = author.history.get()
+        self.assertEqual(h1.get_user(), "somebody")
+        self.assertEqual(h1.extra, "special")
+
+    def test_reserved_name(self):
+        with self.backend.session(username="somebody"):
+            book = Book.objects.create(title="Some Book", order=1)
+            book.year = 1981
+            book.order = 2
+            book.save()
+        self.assertEqual(book.history.count(), 2)
+
+    def test_data_types(self):
+        data = {"hello": "world", "answer": 42, "cost": 12.99}
+        now = timezone.now()
+        with self.backend.session(username="data") as session:
+            obj = RandomData.objects.create(data=data.copy(), date=now)
+            obj.data["answer"] = 420
+            obj.ident = uuid.uuid4()
+            obj.save()
+            obj.delete()
+        self.assertEqual(session.history.count(), 3)
+        insert = session.history.get(change_type=TriggerType.INSERT)
+        update = session.history.get(change_type=TriggerType.UPDATE)
+        delete = session.history.get(change_type=TriggerType.DELETE)
+        self.assertEqual(insert.snapshot["data"], data)
+        self.assertEqual(update.changes["data"][0], data)
+        self.assertEqual(update.changes["data"][1], replace(data, answer=420))
+        self.assertEqual(uuid.UUID(update.snapshot["ident"]), obj.ident)
+        self.assertIsNone(delete.snapshot)
+        self.assertIsNone(delete.changes)
+
+    def test_change_pk(self):
+        with self.backend.session(username="unholy") as session:
+            a = Author.objects.create(name="Bad Idea")
+            with self.backend.conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE {table} SET id = {new_pk} WHERE id = {old_pk}".format(
+                        table=Author._meta.db_table,
+                        new_pk=666,
+                        old_pk=a.pk,
+                    )
+                )
+        self.assertEqual(session.history.count(), 2)
+        update = session.history.get(change_type=TriggerType.UPDATE)
+        self.assertEqual(a.pk, update.object_id)
+        self.assertEqual(update.snapshot, {"id": 666, "name": "Bad Idea"})
+        self.assertEqual(update.changes, {"id": [a.pk, 666]})
+
+
+@override_settings(HISTORY_SNAPSHOTS=False)
+class NoSnapshotTests(TriggersTestCase):
+    def test_no_snapshots(self):
+        with self.backend.session(username="nobody") as session:
+            a = Author.objects.create(name="Nobody")
+            a.name = "Somebody"
+            a.picture = os.urandom(128)
+            a.save()
+            a.delete()
+        self.assertEqual(session.history.count(), 3)
+        insert = session.history.get(change_type=TriggerType.INSERT)
+        update = session.history.get(change_type=TriggerType.UPDATE)
+        delete = session.history.get(change_type=TriggerType.DELETE)
+        self.assertIsNone(insert.snapshot)
+        self.assertIsNone(insert.changes)
+        self.assertIsNone(update.snapshot)
+        self.assertEqual(update.changes, {"name": ["Nobody", "Somebody"]})
+        self.assertIsNone(delete.snapshot)
+        self.assertIsNone(delete.changes)
+
+
+@override_settings(HISTORY_FILTER=nofilter)
+class BinaryTests(TriggersTestCase):
     def test_binary_data(self):
         old_data = os.urandom(1024)
         new_data = os.urandom(1024)
@@ -109,24 +195,6 @@ class BasicTests(TriggersTestCase):
         with self.backend.session(username="nobody") as session:
             dan.delete()
         self.assertEqual(session.history.count(), 1)
-        delete = session.history.get()
-        self.assertTrue(delete.snapshot["picture"].startswith("\\x"))
-        self.assertEqual(binascii.unhexlify(delete.snapshot["picture"][2:]), new_data)
-
-    def test_extra(self):
-        with self.backend.session(username="somebody", extra="special"):
-            author = Author.objects.create(name="Dan Watson")
-        h1 = author.history.get()
-        self.assertEqual(h1.get_user(), "somebody")
-        self.assertEqual(h1.extra, "special")
-
-    def test_reserved_name(self):
-        with self.backend.session(username="somebody"):
-            book = Book.objects.create(title="Some Book", order=1)
-            book.year = 1981
-            book.order = 2
-            book.save()
-        self.assertEqual(book.history.count(), 2)
 
 
 class MiddlewareTests(TriggersTestCase):

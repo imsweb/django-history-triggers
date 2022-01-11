@@ -1,6 +1,6 @@
 from django.contrib.contenttypes.models import ContentType
 
-from history import get_history_model
+from history import conf, get_history_model
 
 from .base import HistoryBackend, HistorySession
 
@@ -9,10 +9,19 @@ TRIGGER_FUNCTION_SQL = """
     DECLARE
         _ctid integer := TG_ARGV[0]::integer;
         _pk_name text := TG_ARGV[1];
+        _record_snap boolean := TG_ARGV[2]::boolean;
+        _fields text[] := TG_ARGV[3:];
         _old jsonb := to_jsonb(OLD);
         _new jsonb := to_jsonb(NEW);
+        _snapshot jsonb;
         _changes jsonb;
     BEGIN
+        IF _record_snap THEN
+            SELECT jsonb_object_agg(key, value) INTO _snapshot
+            FROM jsonb_each(_new)
+            WHERE key = ANY(_fields);
+        END IF;
+
         IF (TG_OP = 'UPDATE') THEN
             SELECT
                 jsonb_object_agg(
@@ -23,7 +32,7 @@ TRIGGER_FUNCTION_SQL = """
                 jsonb_each(_old) o
                 FULL OUTER JOIN jsonb_each(_new) n ON n.key = o.key
             WHERE
-                n.value IS DISTINCT FROM o.value;
+                n.value IS DISTINCT FROM o.value AND n.key = ANY(_fields);
         END IF;
 
         INSERT INTO {table} (
@@ -37,8 +46,8 @@ TRIGGER_FUNCTION_SQL = """
         VALUES (
             substr(TG_OP, 1, 1),
             _ctid,
-            coalesce(_new->>_pk_name, _old->>_pk_name)::{obj_type},
-            coalesce(_new, _old),
+            coalesce(_old->>_pk_name, _new->>_pk_name)::{obj_type},
+            _snapshot,
             _changes,
             {session_values}
         );
@@ -107,19 +116,25 @@ class PostgresHistoryBackend(HistoryBackend):
                 table=model._meta.db_table,
             )
         )
+        field_names = [f.column for f in self.model_fields(model, trigger_type)]
+        if not field_names:
+            return tr_name, []
         self.execute(
             """
                 CREATE TRIGGER {tr_name} AFTER {trans_type} ON {table}
-                FOR EACH ROW EXECUTE PROCEDURE history_record({ctid}, '{pk_col}');
+                FOR EACH ROW EXECUTE PROCEDURE
+                history_record({ctid}, '{pk_col}', {snapshots}{field_list});
             """.format(
                 tr_name=tr_name,
                 trans_type=trigger_type.name.upper(),
                 table=model._meta.db_table,
                 ctid=ct.pk,
                 pk_col=model._meta.pk.column,
+                snapshots=int(conf.SNAPSHOTS and trigger_type.snapshot),
+                field_list=", '" + "', '".join(field_names) + "'",
             )
         )
-        return tr_name
+        return tr_name, field_names
 
     def drop_trigger(self, model, trigger_type):
         self.execute(

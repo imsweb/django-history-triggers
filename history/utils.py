@@ -1,5 +1,6 @@
 from django.apps import apps
 from django.conf import settings
+from django.db import models
 
 
 def get_history_model():
@@ -15,3 +16,7 @@ def get_request_context(request):
         return {field: request.user} if field else {}
     except AttributeError:
         return {}
+
+
+def default_filter(model, field, trigger_type):
+    return not isinstance(field, models.BinaryField)

@@ -14,11 +14,15 @@ class TriggerType(models.TextChoices):
 
     @property
     def snapshot(self):
-        return "OLD" if self == TriggerType.DELETE else "NEW"
+        return self in (TriggerType.INSERT, TriggerType.UPDATE)
 
     @property
     def changes(self):
         return self == TriggerType.UPDATE
+
+    @property
+    def pk_alias(self):
+        return "OLD" if self in (TriggerType.UPDATE, TriggerType.DELETE) else "NEW"
 
 
 class AbstractObjectHistory(models.Model):
@@ -47,6 +51,7 @@ class AbstractObjectHistory(models.Model):
         indexes = [
             models.Index(fields=["content_type", "object_id"]),
         ]
+        get_latest_by = ["session_date", "id"]
 
     def get_user(self):
         return getattr(self, self.USER_FIELD) if self.USER_FIELD else None

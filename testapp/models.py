@@ -1,4 +1,7 @@
+import uuid
+
 from django.db import models
+from django.utils import timezone
 
 from history.models import AbstractObjectHistory, HistoryMixIn
 
@@ -23,3 +26,9 @@ class Book(models.Model, HistoryMixIn):
     authors = models.ManyToManyField(Author, related_name="books")
     year = models.IntegerField(null=True, blank=True)
     order = models.IntegerField(default=0)
+
+
+class RandomData(models.Model, HistoryMixIn):
+    ident = models.UUIDField(default=uuid.uuid4, unique=True)
+    data = models.JSONField(default=dict)
+    date = models.DateTimeField(default=timezone.now)
