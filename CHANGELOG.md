@@ -1,3 +1,8 @@
+## 3.1.1
+
+* Included missing `admin_history.html` template in distribution
+
+
 ## 3.1.0
 
 * Added a `HISTORY_FILTER` setting for excluding models/fields from history, and exclude
