@@ -19,7 +19,7 @@ setup(
     author_email="watsond@imsweb.com",
     url="https://github.com/imsweb/django-history-triggers",
     license="BSD",
-    packages=find_packages(exclude=("testapp", "testapp.*")),
+    packages=find_packages(),
     include_package_data=True,
     classifiers=[
         "Development Status :: 5 - Production/Stable",

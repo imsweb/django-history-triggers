@@ -2,6 +2,7 @@ import binascii
 import os
 import uuid
 
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db.utils import IntegrityError
 from django.test import TestCase
@@ -14,8 +15,6 @@ from history.templatetags.history import json_format
 
 from .models import Author, Book, CustomHistory, RandomData
 
-HistoryModel = get_history_model()
-
 
 def nofilter(model, field, trigger):
     return True
@@ -25,6 +24,10 @@ def replace(d, **kwargs):
     new_dict = d.copy()
     new_dict.update(kwargs)
     return new_dict
+
+
+def test_request_context(request):
+    return {"username": "webuser"}
 
 
 class TriggersTestCase(TestCase):
@@ -42,6 +45,10 @@ class TriggersTestCase(TestCase):
         self.backend = backends.get_backend(cache=False)
 
 
+@override_settings(
+    HISTORY_MODEL="custom.CustomHistory",
+    HISTORY_REQUEST_CONTEXT=test_request_context,
+)
 class BasicTests(TriggersTestCase):
     def test_backend_cache(self):
         b1 = backends.get_backend()
@@ -151,7 +158,7 @@ class BasicTests(TriggersTestCase):
 @override_settings(HISTORY_SNAPSHOTS=False)
 class NoSnapshotTests(TriggersTestCase):
     def test_no_snapshots(self):
-        with self.backend.session(username="nobody") as session:
+        with self.backend.session() as session:
             a = Author.objects.create(name="Nobody")
             a.name = "Somebody"
             a.picture = os.urandom(128)
@@ -174,7 +181,7 @@ class BinaryTests(TriggersTestCase):
     def test_binary_data(self):
         old_data = os.urandom(1024)
         new_data = os.urandom(1024)
-        with self.backend.session(username="nobody") as session:
+        with self.backend.session() as session:
             dan = Author.objects.create(name="Dan Watson", picture=old_data)
             dan.picture = new_data
             dan.save()
@@ -192,17 +199,24 @@ class BinaryTests(TriggersTestCase):
         self.assertEqual(binascii.unhexlify(old_hex[2:]), old_data)
         self.assertTrue(new_hex.startswith("\\x"))
         self.assertEqual(binascii.unhexlify(new_hex[2:]), new_data)
-        with self.backend.session(username="nobody") as session:
+        with self.backend.session() as session:
             dan.delete()
         self.assertEqual(session.history.count(), 1)
 
 
+@override_settings(ROOT_URLCONF="custom.urls")
 class MiddlewareTests(TriggersTestCase):
     def test_lifecycle(self):
+        UserModel = get_user_model()
+        HistoryModel = get_history_model()
+        with self.backend.session():
+            user = UserModel.objects.create_user("testuser")
+            self.client.force_login(user)
         self.client.get("/lifecycle/")
-        self.assertEqual(HistoryModel.objects.count(), 1)
-        insert = HistoryModel.objects.get()
-        self.assertEqual(insert.get_user(), "webuser")
+        # Insert user, update user (last_login), insert Author.
+        self.assertEqual(HistoryModel.objects.count(), 3)
+        insert = Author.history.get()
+        self.assertEqual(insert.get_user(), user)
 
 
 class TemplateTagTests(TestCase):

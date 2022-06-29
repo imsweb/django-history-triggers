@@ -93,3 +93,21 @@ Similarly, if you (for example) only wanted to record history for UPDATE stateme
 def updates_only(model, field, trigger_type):
     return trigger_type == TriggerType.UPDATE
 ```
+
+
+## Management Commands
+
+By default `django-history-triggers` does not override any of Django's management
+commands that may perform database operations, such as `loaddata` or `migrate`. If you
+need to run these commands with history triggers enabled, you can include the following
+apps in your `INSTALLED_APPS` setting:
+
+* `history.contrib.loaddata`
+* `history.contrib.migrate`
+
+The `HISTORY_LOADDATA_CONTEXT` and `HISTORY_MIGRATE_CONTEXT` settings control the
+history session context for the respective command, for example:
+
+```python
+HISTORY_MIGRATE_CONTEXT = {"user": "system"}
+```

@@ -1,5 +1,5 @@
 [run]
 source = history
 omit =
-    manage.py
+    runtests.py
     history/admin.py

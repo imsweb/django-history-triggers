@@ -1,12 +1,6 @@
 import os
 import secrets
 
-
-# Fake getting the request's user for testing purposes.
-def test_request_context(request):
-    return {"username": "webuser"}
-
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = secrets.token_urlsafe()
 DEBUG = True
@@ -20,7 +14,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "history",
-    "testapp",
 ]
 
 MIDDLEWARE = [
@@ -34,7 +27,7 @@ MIDDLEWARE = [
     "history.middleware.HistoryMiddleware",
 ]
 
-ROOT_URLCONF = "testapp.urls"
+ROOT_URLCONF = "urls"
 
 TEMPLATES = [
     {
@@ -52,7 +45,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "testapp.wsgi.application"
+WSGI_APPLICATION = "wsgi.application"
 
 if os.getenv("TEST_ENGINE") == "sqlite":
     DATABASES = {
@@ -73,6 +66,13 @@ else:
         }
     }
 
+MIGRATION_MODULES = {
+    "auth": None,
+    "contenttypes": None,
+    "sessions": None,
+    "history": None,
+}
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
@@ -82,6 +82,3 @@ USE_TZ = True
 STATIC_URL = "/static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
-
-HISTORY_MODEL = "testapp.CustomHistory"
-HISTORY_REQUEST_CONTEXT = test_request_context

@@ -1,3 +1,9 @@
+## 3.2.0
+
+* Added `history.contrib.migrate` and `history.contrib.loaddata` apps that provide
+  wrappers of Django management commands that run within history sessions
+
+
 ## 3.1.1
 
 * Included missing `admin_history.html` template in distribution

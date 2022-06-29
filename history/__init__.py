@@ -1,10 +1,15 @@
+import re
+
 from django.conf import settings
 
 from .backends import get_backend  # noqa
 from .utils import get_history_model  # noqa
 
-__version__ = "3.1.1"
-__version_info__ = tuple(int(num) for num in __version__.split(".") if num.isdigit())
+__version__ = "3.2.0-dev"
+__version_info__ = tuple(
+    int(num) if num.isdigit() else num
+    for num in re.findall(r"([a-z\d]+)", __version__, re.I)
+)
 
 
 class _Configuration:
@@ -26,4 +31,6 @@ conf = _Configuration(
     REQUEST_CONTEXT="history.utils.get_request_context",
     ADMIN_ENABLED=True,
     SNAPSHOTS=True,
+    MIGRATE_CONTEXT={},
+    LOADDATA_CONTEXT={},
 )
