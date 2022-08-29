@@ -29,10 +29,12 @@ TRIGGER_FUNCTION_SQL = """
                     jsonb_build_array(o.value, n.value)
                 ) INTO _changes
             FROM
-                jsonb_each(_old) o
-                FULL OUTER JOIN jsonb_each(_new) n ON n.key = o.key
+                jsonb_each(_old) o,
+                jsonb_each(_new) n
             WHERE
-                n.value IS DISTINCT FROM o.value AND n.key = ANY(_fields);
+                n.key = o.key AND
+                n.key = ANY(_fields) AND
+                n.value IS DISTINCT FROM o.value;
         END IF;
 
         INSERT INTO {table} (
@@ -59,20 +61,19 @@ TRIGGER_FUNCTION_SQL = """
 
 
 class PostgresHistorySession(HistorySession):
-    def start(self):
+    def start_sql(self):
         parts = []
         params = []
         for name, value in self.fields.items():
             parts.append("set_config('history.{field}', %s, false)".format(field=name))
             params.append(str(value))
-        sql = "SELECT {};".format(", ".join(parts))
-        self.backend.execute(sql, params)
+        return "SELECT {};".format(", ".join(parts)), params
 
-    def stop(self):
+    def stop_sql(self):
         parts = []
         for name, value in self.fields.items():
             parts.append("set_config('history.{field}', '', false)".format(field=name))
-        self.backend.execute("SELECT {};".format(", ".join(parts)))
+        return "SELECT {};".format(", ".join(parts)), []
 
 
 class PostgresHistoryBackend(HistoryBackend):

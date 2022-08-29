@@ -39,18 +39,21 @@ class SQLiteHistorySession(HistorySession):
 class SQLiteHistoryBackend(HistoryBackend):
     session_class = SQLiteHistorySession
 
-    def _json_object(self, fields, trigger_type):
+    def _json_object(self, fields, ref):
+        parts = []
+        for f in fields:
+            parts.append("'{}'".format(f.column))
+            parts.append(column(f, ref))
+        return "json_object({})".format(", ".join(parts))
+
+    def _json_snapshot(self, fields, trigger_type):
         """
         Returns an SQL fragment that builds a JSON object from the specified model
         fields.
         """
         if not conf.SNAPSHOTS or not trigger_type.snapshot:
             return "NULL"
-        parts = []
-        for f in fields:
-            parts.append("'{}'".format(f.column))
-            parts.append(column(f, "NEW"))
-        return "json_object({})".format(", ".join(parts))
+        return self._json_object(fields, "NEW")
 
     def _json_changes(self, fields, trigger_type):
         """
@@ -61,34 +64,22 @@ class SQLiteHistoryBackend(HistoryBackend):
         """
         if not trigger_type.changes:
             return "NULL"
-        parts = []
-        for f in fields:
-            parts.append(
-                "json_array('{name}', {old}, {new})".format(
-                    name=f.column,
-                    old=column(f, "OLD"),
-                    new=column(f, "NEW"),
-                )
-            )
-        # Largely taken from:
-        # https://blog.budgetwithbuckets.com/2018/08/27/sqlite-changelog.html
         return """
-            (SELECT
-                json_group_object(col, json_array(oldval, newval)) AS changes
-            FROM
-                (SELECT
-                    json_extract(value, '$[0]') as col,
-                    json_extract(value, '$[1]') as oldval,
-                    json_extract(value, '$[2]') as newval
+            (
+                SELECT
+                    json_group_object(
+                        coalesce(n.key, o.key),
+                        json_array(o.value, n.value)
+                    ) AS changes
                 FROM
-                    json_each(
-                        json_array(
-                            {values}
-                        )
-                    )
-                WHERE oldval IS NOT newval))
+                    json_each({oldvals}) o,
+                    json_each({newvals}) n
+                WHERE
+                    n.key = o.key AND n.value IS NOT o.value
+            )
         """.format(
-            values=", ".join(parts)
+            oldvals=self._json_object(fields, "OLD"),
+            newvals=self._json_object(fields, "NEW"),
         )
 
     def create_trigger(self, model, trigger_type):
@@ -133,7 +124,7 @@ class SQLiteHistoryBackend(HistoryBackend):
                 ctid=ct.pk,
                 pk_ref=trigger_type.pk_alias,
                 pk_col=model._meta.pk.column,
-                snapshot=self._json_object(fields, trigger_type),
+                snapshot=self._json_snapshot(fields, trigger_type),
                 changes=self._json_changes(fields, trigger_type),
                 session_cols=", ".join(session_cols),
                 session_values=", ".join(session_values),

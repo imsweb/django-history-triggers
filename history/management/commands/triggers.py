@@ -27,6 +27,7 @@ class Command(BaseCommand):
         subs = parser.add_subparsers(dest="action")
         subs.add_parser("enable")
         subs.add_parser("disable")
+        subs.add_parser("session")
 
     def handle_enable(self, backend, **options):
         if options["clear"]:
@@ -51,6 +52,18 @@ class Command(BaseCommand):
         backend.remove()
         if options["clear"]:
             backend.clear()
+
+    def handle_session(self, backend, **options):
+        conn = backend.conn
+        fields = {}
+        for f in backend.session_fields():
+            if f.name in ("session_id", "session_date"):
+                continue
+            value = input("{} [{}]: ".format(f.name, f.db_type(conn)))
+            fields[f.name] = value
+        s = backend.session(**fields)
+        sql, params = s.start_sql()
+        print(sql % tuple("'{}'".format(p) for p in params))
 
     def handle(self, **options):
         backend = backends.get_backend(options["database"], cache=False)

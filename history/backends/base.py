@@ -36,11 +36,17 @@ class HistorySession:
     def history(self):
         return get_history_model().objects.filter(session_id=self.session_id)
 
-    def start(self):  # pragma: no cover
+    def start_sql(self):
         raise NotImplementedError()
 
-    def stop(self):  # pragma: no cover
+    def stop_sql(self):
         raise NotImplementedError()
+
+    def start(self):
+        self.backend.execute(*self.start_sql())
+
+    def stop(self):
+        self.backend.execute(*self.stop_sql())
 
     def __enter__(self):
         self.parent = self.backend.current_session

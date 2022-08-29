@@ -5,7 +5,7 @@ from django.conf import settings
 from .backends import get_backend  # noqa
 from .utils import get_history_model  # noqa
 
-__version__ = "3.2.0"
+__version__ = "3.3.0"
 __version_info__ = tuple(
     int(num) if num.isdigit() else num
     for num in re.findall(r"([a-z\d]+)", __version__, re.I)

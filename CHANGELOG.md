@@ -1,3 +1,11 @@
+## 3.3.0
+
+* [sqlite] Better handling of nested JSON within update trigger `changes`
+* Added a `session` CLI subcommand (`manage.py triggers session`) to output the SQL for
+  starting a history session (does not work for sqlite, which uses user-defined
+  functions for history sessions).
+
+
 ## 3.2.0
 
 * Added `history.contrib.migrate` and `history.contrib.loaddata` apps that provide
