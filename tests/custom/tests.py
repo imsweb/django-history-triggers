@@ -154,6 +154,16 @@ class BasicTests(TriggersTestCase):
         self.assertEqual(update.snapshot, {"id": 666, "name": "Bad Idea"})
         self.assertEqual(update.changes, {"id": [a.pk, 666]})
 
+    def test_session_decorator(self):
+        @self.backend.session(username="decorator")
+        def decorator_test():
+            RandomData.objects.create()
+
+        decorator_test()
+        h = RandomData.history.get()
+        self.assertEqual(h.change_type, TriggerType.INSERT)
+        self.assertEqual(h.username, "decorator")
+
 
 @override_settings(HISTORY_SNAPSHOTS=False)
 class NoSnapshotTests(TriggersTestCase):
@@ -204,7 +214,7 @@ class BinaryTests(TriggersTestCase):
         self.assertEqual(session.history.count(), 1)
 
 
-@override_settings(ROOT_URLCONF="custom.urls")
+@override_settings(ROOT_URLCONF="custom.urls", HISTORY_MIDDLEWARE_IGNORE=["/ignore"])
 class MiddlewareTests(TriggersTestCase):
     def test_lifecycle(self):
         UserModel = get_user_model()
@@ -217,6 +227,12 @@ class MiddlewareTests(TriggersTestCase):
         self.assertEqual(HistoryModel.objects.count(), 3)
         insert = Author.history.get()
         self.assertEqual(insert.get_user(), user)
+
+    def test_ignore_prefix(self):
+        self.client.get("/ignored/")
+        self.assertEqual(RandomData.objects.count(), 1)
+        self.assertEqual(RandomData.history.count(), 1)
+        self.assertIsNone(RandomData.history.get().user)
 
 
 class TemplateTagTests(TestCase):

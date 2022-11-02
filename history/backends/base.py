@@ -1,3 +1,4 @@
+import functools
 import uuid
 
 from django.apps import apps
@@ -60,6 +61,14 @@ class HistorySession:
             # Restart the parent session that we were nested within.
             self.parent.start()
         self.backend.current_session = self.parent
+
+    def __call__(self, func):
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+            with self:
+                return func(*args, **kwargs)
+
+        return wrapped
 
 
 class HistoryBackend:

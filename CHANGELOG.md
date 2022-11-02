@@ -1,3 +1,10 @@
+## 3.4.0
+
+* Allow `HistorySession` instances to be used as decorators, expose `history.session`
+  as a convenience method that automatically calls `get_backend`
+* Unit tests for `HISTORY_MIDDLEWARE_IGNORE`
+
+
 ## 3.3.0
 
 * [sqlite] Better handling of nested JSON within update trigger `changes`

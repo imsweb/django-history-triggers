@@ -27,3 +27,7 @@ def get_backend(alias=DEFAULT_DB_ALIAS, cls=None, cache=True):
         backend_cache[alias] = backend
 
     return backend
+
+
+def session(alias=DEFAULT_DB_ALIAS, **context):
+    return get_backend(alias).session(**context)
