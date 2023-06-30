@@ -32,3 +32,13 @@ class RandomData(models.Model, HistoryMixIn):
     ident = models.UUIDField(default=uuid.uuid4, unique=True)
     data = models.JSONField(default=dict)
     date = models.DateTimeField(default=timezone.now)
+
+
+class UnmanagedHistory(AbstractObjectHistory):
+    username = models.TextField()
+
+    USER_FIELD = "username"
+
+    class Meta(AbstractObjectHistory.Meta):
+        db_table = "unmanaged_history"
+        managed = False

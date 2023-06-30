@@ -6,7 +6,7 @@ that automatically record inserts, updates, and deletes to model tables.
 
 ## Requirements
 
-* Django 3.1+
+* Django 3.2+
 * PostgreSQL or SQLite database
 
 
