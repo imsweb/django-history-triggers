@@ -46,7 +46,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install requirements
-      run: pip install "Django~=${{ matrix.django-version }}.0" "psycopg2-binary<2.9"
+      run: pip install "Django~=${{ matrix.django-version }}.0" psycopg2-binary
     - name: Run Tests (PostgreSQL)
       run: python runtests.py
     - name: Run Tests (SQLite)
