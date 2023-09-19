@@ -33,4 +33,5 @@ conf = _Configuration(
     SNAPSHOTS=True,
     MIGRATE_CONTEXT={},
     LOADDATA_CONTEXT={},
+    INCLUDE_UNMANAGED=True,
 )
