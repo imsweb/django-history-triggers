@@ -32,6 +32,7 @@ that automatically record inserts, updates, and deletes to model tables.
 * `HISTORY_FILTER` (default: `"history.utils.default_filter"`)
 * `HISTORY_REQUEST_CONTEXT` (default: `"history.utils.get_request_context"`)
 * `HISTORY_ADMIN_ENABLED` (default: `True`)
+* `HISTORY_INCLUDE_UNMANAGED` (default: `True`)
 
 
 ## History Sessions

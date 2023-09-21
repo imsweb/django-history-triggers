@@ -1,3 +1,9 @@
+## 3.4.1
+
+* Added a `HISTORY_INCLUDE_UNMANAGED` setting to determine if history should be created
+  for unmanaged (`managed = False`) models. Defaults to `True`.
+
+
 ## 3.4.0
 
 * Allow `HistorySession` instances to be used as decorators, expose `history.session`
