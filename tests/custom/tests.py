@@ -169,10 +169,10 @@ class BasicTests(TriggersTestCase):
 
     def test_pause(self):
         with self.backend.session(username="sneaky") as session:
-            a = Author.objects.create(name="First Author")
+            Author.objects.create(name="First Author")
             with session.pause():
-                b = Author.objects.create(name="Second Author")
-            c = Author.objects.create(name="Third Author")
+                Author.objects.create(name="Second Author")
+            Author.objects.create(name="Third Author")
         self.assertEqual(session.history.count(), 2)
 
 

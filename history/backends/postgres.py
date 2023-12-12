@@ -1,4 +1,5 @@
 import contextlib
+
 from django.contrib.contenttypes.models import ContentType
 
 from history import conf, get_history_model
