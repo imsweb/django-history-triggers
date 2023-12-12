@@ -1,3 +1,9 @@
+## 3.4.2
+
+* Added a `pause` context manager to `HistorySession`, to allow for temporarily
+  suspending history recording during a session.
+
+
 ## 3.4.1
 
 * Added a `HISTORY_INCLUDE_UNMANAGED` setting to determine if history should be created

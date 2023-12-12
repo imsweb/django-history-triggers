@@ -1,3 +1,4 @@
+import contextlib
 from django.contrib.contenttypes.models import ContentType
 
 from history import conf, get_history_model
@@ -15,7 +16,12 @@ TRIGGER_FUNCTION_SQL = """
         _new jsonb := to_jsonb(NEW);
         _snapshot jsonb;
         _changes jsonb;
+        _paused boolean;
     BEGIN
+        IF current_setting('history.__paused', true) IS NOT DISTINCT FROM 'true' THEN
+            RETURN NULL;
+        END IF;
+
         IF _record_snap THEN
             SELECT jsonb_object_agg(key, value) INTO _snapshot
             FROM jsonb_each(_new)
@@ -74,6 +80,14 @@ class PostgresHistorySession(HistorySession):
         for name, value in self.fields.items():
             parts.append("set_config('history.{field}', '', false)".format(field=name))
         return "SELECT {};".format(", ".join(parts)), []
+
+    @contextlib.contextmanager
+    def pause(self):
+        self.backend.execute("SELECT set_config('history.__paused', 'true', false)")
+        try:
+            yield self
+        finally:
+            self.backend.execute("SELECT set_config('history.__paused', NULL, false)")
 
 
 class PostgresHistoryBackend(HistoryBackend):

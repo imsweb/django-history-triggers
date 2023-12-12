@@ -167,6 +167,14 @@ class BasicTests(TriggersTestCase):
         self.assertEqual(h.change_type, TriggerType.INSERT)
         self.assertEqual(h.username, "decorator")
 
+    def test_pause(self):
+        with self.backend.session(username="sneaky") as session:
+            a = Author.objects.create(name="First Author")
+            with session.pause():
+                b = Author.objects.create(name="Second Author")
+            c = Author.objects.create(name="Third Author")
+        self.assertEqual(session.history.count(), 2)
+
 
 @override_settings(HISTORY_SNAPSHOTS=False)
 class NoSnapshotTests(TriggersTestCase):

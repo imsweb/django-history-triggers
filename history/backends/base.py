@@ -1,3 +1,4 @@
+import contextlib
 import functools
 import uuid
 
@@ -48,6 +49,10 @@ class HistorySession:
 
     def stop(self):
         self.backend.execute(*self.stop_sql())
+
+    @contextlib.contextmanager
+    def pause(self):
+        raise NotImplementedError()
 
     def __enter__(self):
         self.parent = self.backend.current_session

@@ -1,3 +1,4 @@
+import contextlib
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
@@ -29,10 +30,27 @@ class SQLiteHistorySession(HistorySession):
                 "history_{}".format(field.column), 0, getter(field.name)
             )
 
+        # History recording is enabled by default.
+        self.backend.conn.connection.create_function(
+            "_history_enabled", 0, lambda: True
+        )
+
     def stop(self):
         for field in self.backend.session_fields():
             self.backend.conn.connection.create_function(
                 "history_{}".format(field.column), 0, lambda: None
+            )
+
+    @contextlib.contextmanager
+    def pause(self):
+        self.backend.conn.connection.create_function(
+            "_history_enabled", 0, lambda: False
+        )
+        try:
+            yield self
+        finally:
+            self.backend.conn.connection.create_function(
+                "_history_enabled", 0, lambda: True
             )
 
 
@@ -106,14 +124,14 @@ class SQLiteHistoryBackend(HistoryBackend):
                     changes,
                     {session_cols}
                 )
-                VALUES (
+                SELECT
                     '{change_type}',
                     {ctid},
                     {pk_ref}.{pk_col},
                     {snapshot},
                     {changes},
                     {session_values}
-                );
+                WHERE _history_enabled();
             END;
             """.format(
                 trigger_name=tr_name,
