@@ -39,6 +39,11 @@ jobs:
       matrix:
         django-version: ['3.2', '4.2', '5.0']
         python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        exclude:
+          - django-version: '5.0'
+            python-version: '3.8'
+          - django-version: '5.0'
+            python-version: '3.9'
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
