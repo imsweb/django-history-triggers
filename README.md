@@ -56,7 +56,7 @@ Starting in 3.4.2, you can also "pause" history recording within a session:
 ```python
  with get_backend().session() as session:
      Model.objects.create(name="This history is recorded")
-     with session.pause():
+     with session.paused():
         Model.objects.create(name="This history is NOT recorded")
      Model.objects.create(name="This history is also recorded")
 ```
