@@ -50,9 +50,18 @@ class HistorySession:
     def stop(self):
         self.backend.execute(*self.stop_sql())
 
-    @contextlib.contextmanager
     def pause(self):
         raise NotImplementedError()
+
+    def resume(self):
+        raise NotImplementedError()
+
+    @contextlib.contextmanager
+    def paused(self):
+        try:
+            yield self.pause()
+        finally:
+            self.resume()
 
     def __enter__(self):
         self.parent = self.backend.current_session

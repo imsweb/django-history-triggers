@@ -1,5 +1,3 @@
-import contextlib
-
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
@@ -42,17 +40,15 @@ class SQLiteHistorySession(HistorySession):
                 "history_{}".format(field.column), 0, lambda: None
             )
 
-    @contextlib.contextmanager
     def pause(self):
         self.backend.conn.connection.create_function(
             "_history_enabled", 0, lambda: False
         )
-        try:
-            yield self
-        finally:
-            self.backend.conn.connection.create_function(
-                "_history_enabled", 0, lambda: True
-            )
+
+    def resume(self):
+        self.backend.conn.connection.create_function(
+            "_history_enabled", 0, lambda: True
+        )
 
 
 class SQLiteHistoryBackend(HistoryBackend):

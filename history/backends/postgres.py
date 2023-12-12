@@ -1,5 +1,3 @@
-import contextlib
-
 from django.contrib.contenttypes.models import ContentType
 
 from history import conf, get_history_model
@@ -82,13 +80,11 @@ class PostgresHistorySession(HistorySession):
             parts.append("set_config('history.{field}', '', false)".format(field=name))
         return "SELECT {};".format(", ".join(parts)), []
 
-    @contextlib.contextmanager
     def pause(self):
         self.backend.execute("SELECT set_config('history.__paused', 'true', false)")
-        try:
-            yield self
-        finally:
-            self.backend.execute("SELECT set_config('history.__paused', NULL, false)")
+
+    def resume(self):
+        self.backend.execute("SELECT set_config('history.__paused', NULL, false)")
 
 
 class PostgresHistoryBackend(HistoryBackend):

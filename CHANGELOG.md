@@ -1,7 +1,12 @@
+## 3.4.3
+
+* Added a `paused` context manager to `HistorySession`, to allow for temporarily
+  suspending history recording during a session.
+
+
 ## 3.4.2
 
-* Added a `pause` context manager to `HistorySession`, to allow for temporarily
-  suspending history recording during a session.
+*Yanked to correct a bad API decision*
 
 
 ## 3.4.1

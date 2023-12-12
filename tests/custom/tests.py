@@ -170,10 +170,14 @@ class BasicTests(TriggersTestCase):
     def test_pause(self):
         with self.backend.session(username="sneaky") as session:
             Author.objects.create(name="First Author")
-            with session.pause():
+            with session.paused():
                 Author.objects.create(name="Second Author")
             Author.objects.create(name="Third Author")
-        self.assertEqual(session.history.count(), 2)
+            session.pause()
+            Author.objects.create(name="Fourth Author")
+            session.resume()
+            Author.objects.create(name="Fifth Author")
+        self.assertEqual(session.history.count(), 3)
 
 
 @override_settings(HISTORY_SNAPSHOTS=False)
