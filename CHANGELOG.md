@@ -1,3 +1,8 @@
+## 3.4.4
+
+* `CASCADE` when dropping the `history_record` function.
+
+
 ## 3.4.3
 
 * Added a `paused` context manager to `HistorySession`, to allow for temporarily

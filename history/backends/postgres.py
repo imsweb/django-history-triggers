@@ -113,7 +113,7 @@ class PostgresHistoryBackend(HistoryBackend):
         )
 
     def remove(self):
-        self.execute("DROP FUNCTION IF EXISTS history_record();")
+        self.execute("DROP FUNCTION IF EXISTS history_record() CASCADE;")
 
     def clear(self):
         HistoryModel = get_history_model()
