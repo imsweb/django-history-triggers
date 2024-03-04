@@ -47,7 +47,7 @@ class HistoryAdminMixin:
             **self.admin_site.each_context(request),
             "use_json": USE_JSON,
             "history": object_history,
-            "title": f"{ model_class.__name__ } History",
+            "title": f"{model_class.__name__} History",
             "opts": model_class._meta,
             "queryset": queryset,
             **(extra_context or {}),
