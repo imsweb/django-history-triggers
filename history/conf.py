@@ -35,5 +35,5 @@ REQUEST_USER_ATTRIBUTE = getattr(settings, "HISTORY_REQUEST_USER_ATTRIBUTE", "pk
 MIDDLEWARE_IGNORE = getattr(
     settings,
     "HISTORY_MIDDLEWARE_IGNORE",
-    [settings.STATIC_URL.lstrip("/"), settings.MEDIA_URL.lstrip("/")],
+    [settings.STATIC_URL, settings.MEDIA_URL],
 )
