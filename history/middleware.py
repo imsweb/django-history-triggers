@@ -22,7 +22,7 @@ class HistoryMiddleware(object):
     def __call__(self, request):
         create_history = True
         for prefix in conf.MIDDLEWARE_IGNORE:
-            if prefix and prefix != '/' and request.path.startswith(prefix):
+            if prefix and prefix != "/" and request.path.startswith(prefix):
                 create_history = False
 
         if create_history:
