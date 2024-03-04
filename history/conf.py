@@ -33,5 +33,5 @@ REQUEST_USER_ATTRIBUTE = getattr(settings, "HISTORY_REQUEST_USER_ATTRIBUTE", "pk
 
 # A list of path prefixes the history middleware should ignore.
 MIDDLEWARE_IGNORE = getattr(
-    settings, "HISTORY_MIDDLEWARE_IGNORE", [settings.STATIC_URL, settings.MEDIA_URL]
+    settings, "HISTORY_MIDDLEWARE_IGNORE", [settings.STATIC_URL.lstrip('/'), settings.MEDIA_URL.lstrip('/')]
 )
