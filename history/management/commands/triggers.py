@@ -223,9 +223,9 @@ def create_history_table(cursor, base_table, pk_name, pk_type):
             "schema": conf.SCHEMA_NAME,
             "table": history_table,
             "role": conf.DB_ROLE,
-            "timestamp_type": "timestamp with time zone"
-            if conf.USE_TIMEZONES
-            else "timestamp",
+            "timestamp_type": (
+                "timestamp with time zone" if conf.USE_TIMEZONES else "timestamp"
+            ),
             "pk_name": pk_name,
             "pk_type": pk_type,
             "user_field": conf.USER_FIELD,
@@ -450,9 +450,9 @@ def create_trigger(cursor, trigger_type, table_name, pk_name, table_schema="publ
         "history_user_field": conf.USER_FIELD,
         "return": "OLD" if trigger_type == "delete" else "NEW",
         "role": conf.DB_ROLE,
-        "timestamp_type": "timestamp with time zone"
-        if conf.USE_TIMEZONES
-        else "timestamp",
+        "timestamp_type": (
+            "timestamp with time zone" if conf.USE_TIMEZONES else "timestamp"
+        ),
         "user_type": conf.USER_TYPE,
         "default_user": maybe_quote(conf.DEFAULT_USER),
         "default_user_error": "true" if conf.DEFAULT_USER_ERROR else "false",
