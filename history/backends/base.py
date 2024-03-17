@@ -36,7 +36,11 @@ class HistorySession:
 
     @property
     def history(self):
-        return get_history_model().objects.filter(session_id=self.session_id)
+        return (
+            get_history_model()
+            .objects.using(self.backend.alias)
+            .filter(session_id=self.session_id)
+        )
 
     def start_sql(self):
         raise NotImplementedError()
@@ -108,7 +112,7 @@ class HistoryBackend:
         pass
 
     def clear(self):
-        get_history_model().objects.all().delete()
+        get_history_model().objects.using(self.alias).all().delete()
 
     def get_models(self):
         return [
