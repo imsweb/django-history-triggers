@@ -1,3 +1,8 @@
+## 3.4.5
+
+* Properly specify database alias for Django queries in the history backends
+
+
 ## 3.4.4
 
 * `CASCADE` when dropping the `history_record` function.
