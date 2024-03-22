@@ -99,7 +99,7 @@ class SQLiteHistoryBackend(HistoryBackend):
 
     def create_trigger(self, model, trigger_type):
         HistoryModel = get_history_model()
-        ct = ContentType.objects.get_for_model(model)
+        ct = ContentType.objects.db_manager(self.alias).get_for_model(model)
         tr_name = self.trigger_name(model, trigger_type)
         session_cols = []
         session_values = []

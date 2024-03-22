@@ -17,7 +17,7 @@ class HistoryAdminMixin:
 
     def show_history(self, request, queryset, extra_context=None):
         model_class = queryset.model
-        ct = ContentType.objects.get_for_model(model_class)
+        ct = ContentType.objects.db_manager(queryset._db).get_for_model(model_class)
         object_history = (
             get_history_model()
             .objects.filter(

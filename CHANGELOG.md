@@ -1,3 +1,8 @@
+## 3.4.6
+
+* Properly specify database alias for ContentType queries
+
+
 ## 3.4.5
 
 * Properly specify database alias for Django queries in the history backends

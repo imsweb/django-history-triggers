@@ -58,7 +58,9 @@ class AbstractObjectHistory(models.Model):
 
     def __str__(self):
         # Use the ContentType cache instead of FK lookups every time.
-        ct = ContentType.objects.get_for_id(self.content_type_id)
+        ct = ContentType.objects.db_manager(self._state.db).get_for_id(
+            self.content_type_id
+        )
         return "{} {}({})".format(
             self.get_change_type_display(),
             ct.model_class()._meta.label,
@@ -87,7 +89,8 @@ class ObjectHistory(AbstractObjectHistory):
 
 class HistoryDescriptor:
     def __get__(self, instance, owner=None):
-        ct = ContentType.objects.get_for_model(instance or owner)
+        using = instance._state.db if instance else None
+        ct = ContentType.objects.db_manager(using).get_for_model(instance or owner)
         qs = get_history_model().objects.filter(content_type=ct)
         if instance:
             qs = qs.filter(object_id=instance.pk)

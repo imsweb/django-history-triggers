@@ -120,7 +120,7 @@ class PostgresHistoryBackend(HistoryBackend):
         self.execute("TRUNCATE {table};".format(table=HistoryModel._meta.db_table))
 
     def create_trigger(self, model, trigger_type):
-        ct = ContentType.objects.get_for_model(model)
+        ct = ContentType.objects.db_manager(self.alias).get_for_model(model)
         tr_name = self.trigger_name(model, trigger_type)
         self.execute(
             "DROP TRIGGER IF EXISTS {tr_name} ON {table};".format(
