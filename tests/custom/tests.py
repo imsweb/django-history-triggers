@@ -288,7 +288,9 @@ class PartitionTests(TriggersTestCase):
                 "username" text NOT NULL,
                 PRIMARY KEY ("id", "session_date")
             ) PARTITION BY RANGE ("session_date")
-        """.format(UnmanagedHistory._meta.db_table)
+        """.format(
+            UnmanagedHistory._meta.db_table
+        )
         # Generate the CREATE TABLE for the partition for this year.
         today = datetime.date.today()
         cls.partition_name = UnmanagedHistory._meta.db_table + "_" + str(today.year)
