@@ -16,7 +16,7 @@ from history import backends, get_history_model
 from history.models import TriggerType
 from history.templatetags.history import json_format
 
-from .models import Author, Book, CustomHistory, RandomData, UnmanagedHistory
+from .models import Author, Book, CustomHistory, RandomData, UnmanagedHistory, Untracked
 
 
 def nofilter(model, field, trigger):
@@ -179,6 +179,10 @@ class BasicTests(TriggersTestCase):
             Author.objects.create(name="Fifth Author")
         self.assertEqual(session.history.count(), 3)
 
+    @override_settings(HISTORY_IGNORE_MODELS=["custom.untracked"])
+    def test_untracked_model(self):
+        self.assertNotIn(Untracked, self.backend.get_models())
+
 
 @override_settings(HISTORY_SNAPSHOTS=False)
 class NoSnapshotTests(TriggersTestCase):
@@ -284,9 +288,7 @@ class PartitionTests(TriggersTestCase):
                 "username" text NOT NULL,
                 PRIMARY KEY ("id", "session_date")
             ) PARTITION BY RANGE ("session_date")
-        """.format(
-            UnmanagedHistory._meta.db_table
-        )
+        """.format(UnmanagedHistory._meta.db_table)
         # Generate the CREATE TABLE for the partition for this year.
         today = datetime.date.today()
         cls.partition_name = UnmanagedHistory._meta.db_table + "_" + str(today.year)

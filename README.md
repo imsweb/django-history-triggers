@@ -28,6 +28,7 @@ that automatically record inserts, updates, and deletes to model tables.
 
 * `HISTORY_MODEL` (default: `"history.ObjectHistory"`)
 * `HISTORY_IGNORE_APPS` (default: `["admin", "contenttypes", "sessions"]`)
+* `HISTORY_IGNORE_MODELS` (default `[]` - should be lowercase `app_label.model_name`)
 * `HISTORY_MIDDLEWARE_IGNORE` (default: `[]`)
 * `HISTORY_FILTER` (default: `"history.utils.default_filter"`)
 * `HISTORY_REQUEST_CONTEXT` (default: `"history.utils.get_request_context"`)

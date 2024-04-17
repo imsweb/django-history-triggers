@@ -120,6 +120,7 @@ class HistoryBackend:
             for model in apps.get_models(include_auto_created=True)
             if not issubclass(model, AbstractObjectHistory)
             and model._meta.app_label not in conf.IGNORE_APPS
+            and model._meta.label_lower not in conf.IGNORE_MODELS
             and (model._meta.managed or conf.INCLUDE_UNMANAGED)
         ]
 

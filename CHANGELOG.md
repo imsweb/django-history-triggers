@@ -1,3 +1,9 @@
+## 3.4.7
+
+* Added a `HISTORY_IGNORE_MODELS` setting to ignore individual models. This should be a
+  list of lowercase `app_label.model_name` models to exclude.
+
+
 ## 3.4.6
 
 * Properly specify database alias for ContentType queries

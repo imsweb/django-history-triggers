@@ -42,3 +42,7 @@ class UnmanagedHistory(AbstractObjectHistory):
     class Meta(AbstractObjectHistory.Meta):
         db_table = "unmanaged_history"
         managed = False
+
+
+class Untracked(models.Model):
+    name = models.CharField(max_length=100)
