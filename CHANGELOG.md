@@ -1,6 +1,7 @@
 ## 3.4.8
 
-* Removed `trigger_type.snapshot` so that delete triggers will now record snapshots
+* Removed `trigger_type.snapshot` so that delete triggers will now record snapshots.
+  Added `trigger_type.snapshot_of` to determine snapshot of OLD or NEW object.
 
 
 ## 3.4.7
