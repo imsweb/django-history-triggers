@@ -68,7 +68,7 @@ class SQLiteHistoryBackend(HistoryBackend):
         """
         if not conf.SNAPSHOTS:
             return "NULL"
-        return self._json_object(fields, "NEW")
+        return self._json_object(fields, trigger_type.snapshot_of)
 
     def _json_changes(self, fields, trigger_type):
         """
