@@ -23,11 +23,11 @@ TRIGGER_FUNCTION_SQL = """
         END IF;
 
         IF _record_snap THEN
-            IF _snap_of == 'OLD' THEN
+            IF _snap_of = 'OLD' THEN
                 SELECT jsonb_object_agg(key, value) INTO _snapshot
                 FROM jsonb_each(_old)
                 WHERE key = ANY(_fields);
-            ELSEIF _snap_of == 'NEW' THEN
+            ELSEIF _snap_of = 'NEW' THEN
                 SELECT jsonb_object_agg(key, value) INTO _snapshot
                 FROM jsonb_each(_new)
                 WHERE key = ANY(_fields);
