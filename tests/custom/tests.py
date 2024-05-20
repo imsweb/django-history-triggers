@@ -84,7 +84,7 @@ class BasicTests(TriggersTestCase):
         # Check delete history.
         self.assertEqual(delete.session_id, session.session_id)
         self.assertEqual(delete.get_user(), "nobody")
-        self.assertIsNone(delete.snapshot)
+        self.assertEqual(delete.snapshot, {"id": pk, "name": "Somebody"})
         self.assertIsNone(delete.changes)
 
     def test_no_session(self):
@@ -137,7 +137,8 @@ class BasicTests(TriggersTestCase):
         self.assertEqual(update.changes["data"][0], data)
         self.assertEqual(update.changes["data"][1], replace(data, answer=420))
         self.assertEqual(uuid.UUID(update.snapshot["ident"]), obj.ident)
-        self.assertIsNone(delete.snapshot)
+        self.assertEqual(delete.snapshot["data"], replace(data, answer=420))
+        self.assertEqual(uuid.UUID(delete.snapshot["ident"]), obj.ident)
         self.assertIsNone(delete.changes)
 
     def test_change_pk(self):

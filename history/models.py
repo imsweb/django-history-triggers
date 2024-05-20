@@ -13,8 +13,8 @@ class TriggerType(models.TextChoices):
     UPDATE = "U", _("Update")
 
     @property
-    def snapshot(self):
-        return self in (TriggerType.INSERT, TriggerType.UPDATE)
+    def snapshot_of(self):
+        return "OLD" if self == TriggerType.DELETE else "NEW"
 
     @property
     def changes(self):
