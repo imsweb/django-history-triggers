@@ -1,3 +1,8 @@
+## 3.4.8
+
+* Removed `trigger_type.snapshot` so that delete triggers will now record snapshots
+
+
 ## 3.4.7
 
 * Added a `HISTORY_IGNORE_MODELS` setting to ignore individual models. This should be a

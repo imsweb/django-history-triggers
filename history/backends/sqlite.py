@@ -66,7 +66,7 @@ class SQLiteHistoryBackend(HistoryBackend):
         Returns an SQL fragment that builds a JSON object from the specified model
         fields.
         """
-        if not conf.SNAPSHOTS or not trigger_type.snapshot:
+        if not conf.SNAPSHOTS:
             return "NULL"
         return self._json_object(fields, "NEW")
 

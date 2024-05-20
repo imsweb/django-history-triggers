@@ -142,7 +142,7 @@ class PostgresHistoryBackend(HistoryBackend):
                 table=model._meta.db_table,
                 ctid=ct.pk,
                 pk_col=model._meta.pk.column,
-                snapshots=int(conf.SNAPSHOTS and trigger_type.snapshot),
+                snapshots=int(conf.SNAPSHOTS),
                 field_list=", '" + "', '".join(field_names) + "'",
             )
         )
