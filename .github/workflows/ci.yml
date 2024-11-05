@@ -34,10 +34,10 @@ jobs:
         django-version: ["4.2", "5.0", "5.1"]
         python-version: ["3.10", "3.11", "3.12"]
         include:
-          - python-version: "3.9"
-            django-version: "4.2"
-          - python-version: "3.13"
-            django-version: "5.1"
+          - django-version: "4.2"
+            python-version: "3.9"
+          - django-version: "5.1"
+            python-version: "3.13"
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
@@ -49,6 +49,6 @@ jobs:
     - name: Install Django
       run: uv pip install "Django~=${{ matrix.django-version }}"
     - name: Run Tests (PostgreSQL)
-      run: uv run manage.py test
+      run: uv run --no-sync manage.py test
     - name: Run Tests (SQLite)
-      run: TEST_ENGINE=sqlite uv run manage.py test
+      run: TEST_ENGINE=sqlite uv run --no-sync manage.py test
