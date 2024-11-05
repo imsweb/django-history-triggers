@@ -2,23 +2,17 @@ name: CI
 
 on: [push, pull_request]
 
+env:
+  UV_SYSTEM_PYTHON: 1
+  UV_PYTHON_DOWNLOADS: never
+  UV_PYTHON_PREFERENCE: only-system
+
 jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
-    - name: Install Checkers
-      run: pip install black isort flake8
-    - name: black
-      run: black --check .
-    - name: isort
-      run: isort --check .
-    - name: flake8
-      run: flake8
+      - uses: actions/checkout@v4
+      - uses: chartboost/ruff-action@v1
 
   test:
     runs-on: ubuntu-latest
@@ -37,22 +31,24 @@ jobs:
           - 5432:5432
     strategy:
       matrix:
-        django-version: ['3.2', '4.2', '5.0']
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
-        exclude:
-          - django-version: '5.0'
-            python-version: '3.8'
-          - django-version: '5.0'
-            python-version: '3.9'
+        django-version: ["4.2", "5.0", "5.1"]
+        python-version: ["3.10", "3.11", "3.12"]
+        include:
+          - python-version: "3.9"
+            django-version: "4.2"
+          - python-version: "3.13"
+            django-version: "5.1"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install requirements
-      run: pip install "Django~=${{ matrix.django-version }}.0" psycopg2-binary
+    - name: Setup uv
+      uses: astral-sh/setup-uv@v3
+    - name: Install Django
+      run: uv pip install "Django~=${{ matrix.django-version }}"
     - name: Run Tests (PostgreSQL)
-      run: python runtests.py
+      run: uv run manage.py test
     - name: Run Tests (SQLite)
-      run: TEST_ENGINE=sqlite python runtests.py
+      run: TEST_ENGINE=sqlite uv run manage.py test

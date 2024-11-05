@@ -1,0 +1,42 @@
+[project]
+name = "django-history-triggers"
+authors = [
+    {name = "Dan Watson", email = "watsond@imsweb.com"},
+]
+dynamic = ["version"]
+description = "Management command and middleware for Django history triggers."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "BSD-2-Clause"}
+dependencies = []
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Topic :: Utilities",
+]
+
+[dependency-groups]
+dev = [
+    "psycopg[binary]",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.urls]
+Repository = "https://github.com/imsweb/django-history-triggers"
+
+[tool.hatch.version]
+path = "src/history/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/history"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+isort.known-first-party = ["history"]

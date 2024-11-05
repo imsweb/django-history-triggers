@@ -14,6 +14,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "history",
+    "testapp",
 ]
 
 MIDDLEWARE = [
@@ -27,7 +28,7 @@ MIDDLEWARE = [
     "history.middleware.HistoryMiddleware",
 ]
 
-ROOT_URLCONF = "urls"
+ROOT_URLCONF = "testapp.urls"
 
 TEMPLATES = [
     {

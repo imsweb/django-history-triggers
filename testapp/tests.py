@@ -49,7 +49,7 @@ class TriggersTestCase(TestCase):
 
 
 @override_settings(
-    HISTORY_MODEL="custom.CustomHistory",
+    HISTORY_MODEL="testapp.CustomHistory",
     HISTORY_REQUEST_CONTEXT=test_request_context,
 )
 class BasicTests(TriggersTestCase):
@@ -180,7 +180,7 @@ class BasicTests(TriggersTestCase):
             Author.objects.create(name="Fifth Author")
         self.assertEqual(session.history.count(), 3)
 
-    @override_settings(HISTORY_IGNORE_MODELS=["custom.untracked"])
+    @override_settings(HISTORY_IGNORE_MODELS=["testapp.untracked"])
     def test_untracked_model(self):
         self.assertNotIn(Untracked, self.backend.get_models())
 
@@ -234,7 +234,7 @@ class BinaryTests(TriggersTestCase):
         self.assertEqual(session.history.count(), 1)
 
 
-@override_settings(ROOT_URLCONF="custom.urls", HISTORY_MIDDLEWARE_IGNORE=["/ignore"])
+@override_settings(HISTORY_MIDDLEWARE_IGNORE=["/ignore"])
 class MiddlewareTests(TriggersTestCase):
     def test_lifecycle(self):
         UserModel = get_user_model()
@@ -270,7 +270,7 @@ class TemplateTagTests(TestCase):
     "Table partitioning not available on SQLite",
 )
 @override_settings(
-    HISTORY_MODEL="custom.UnmanagedHistory",
+    HISTORY_MODEL="testapp.UnmanagedHistory",
     HISTORY_REQUEST_CONTEXT=test_request_context,
 )
 class PartitionTests(TriggersTestCase):
@@ -289,9 +289,7 @@ class PartitionTests(TriggersTestCase):
                 "username" text NOT NULL,
                 PRIMARY KEY ("id", "session_date")
             ) PARTITION BY RANGE ("session_date")
-        """.format(
-            UnmanagedHistory._meta.db_table
-        )
+        """.format(UnmanagedHistory._meta.db_table)
         # Generate the CREATE TABLE for the partition for this year.
         today = datetime.date.today()
         cls.partition_name = UnmanagedHistory._meta.db_table + "_" + str(today.year)
