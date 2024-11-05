@@ -45,9 +45,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Setup uv
       uses: astral-sh/setup-uv@v3
-    - name: Install Django
-      run: uv pip install "Django~=${{ matrix.django-version }}"
     - name: Run Tests (PostgreSQL)
-      run: uv run manage.py test
+      run: uv run --with "Django~=${{ matrix.django-version }}" manage.py test
     - name: Run Tests (SQLite)
-      run: TEST_ENGINE=sqlite uv run manage.py test
+      run: TEST_ENGINE=sqlite uv run --with "Django~=${{ matrix.django-version }}" manage.py test
