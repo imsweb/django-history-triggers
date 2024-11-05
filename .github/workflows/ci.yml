@@ -3,7 +3,6 @@ name: CI
 on: [push, pull_request]
 
 env:
-  UV_SYSTEM_PYTHON: 1
   UV_PYTHON_DOWNLOADS: never
   UV_PYTHON_PREFERENCE: only-system
 
@@ -49,6 +48,6 @@ jobs:
     - name: Install Django
       run: uv pip install "Django~=${{ matrix.django-version }}"
     - name: Run Tests (PostgreSQL)
-      run: uv run --no-sync manage.py test
+      run: uv run manage.py test
     - name: Run Tests (SQLite)
-      run: TEST_ENGINE=sqlite uv run --no-sync manage.py test
+      run: TEST_ENGINE=sqlite uv run manage.py test
