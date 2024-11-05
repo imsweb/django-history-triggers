@@ -1,3 +1,9 @@
+## 3.6.0
+
+* Switched to [uv](https://docs.astral.sh/uv/) for development
+* Ensure backend cache is thread-safe (#11)
+
+
 ## 3.5.0
 
 * Removed `TriggerType.snapshot` so that delete triggers will now record snapshots.

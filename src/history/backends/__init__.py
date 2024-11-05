@@ -1,12 +1,13 @@
+from asgiref.local import Local
 from django.conf import settings
 from django.db import DEFAULT_DB_ALIAS
 
-backend_cache = {}
+backend_cache = Local()
 
 
 def get_backend(alias=DEFAULT_DB_ALIAS, cls=None, cache=True):
-    if cache and alias in backend_cache:
-        return backend_cache[alias]
+    if cache and hasattr(backend_cache, alias):
+        return getattr(backend_cache, alias)
 
     if cls:
         backend = cls(alias)
@@ -24,7 +25,7 @@ def get_backend(alias=DEFAULT_DB_ALIAS, cls=None, cache=True):
             raise ValueError("Unsupported database engine: {}".format(engine))
 
     if cache:
-        backend_cache[alias] = backend
+        setattr(backend_cache, alias, backend)
 
     return backend
 

@@ -21,6 +21,7 @@ classifiers = [
 
 [dependency-groups]
 dev = [
+    "django",
     "psycopg[binary]",
 ]
 
