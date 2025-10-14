@@ -1,12 +1,12 @@
 [project]
 name = "django-history-triggers"
+version = "3.7.0"
 authors = [
     {name = "Dan Watson", email = "watsond@imsweb.com"},
 ]
-dynamic = ["version"]
 description = "Management command and middleware for Django history triggers."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {text = "BSD-2-Clause"}
 dependencies = []
 classifiers = [
@@ -19,6 +19,9 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
+[project.urls]
+Repository = "https://github.com/imsweb/django-history-triggers"
+
 [dependency-groups]
 dev = [
     "django",
@@ -26,17 +29,11 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.9.2,<0.10.0"]
+build-backend = "uv_build"
 
-[project.urls]
-Repository = "https://github.com/imsweb/django-history-triggers"
-
-[tool.hatch.version]
-path = "src/history/__init__.py"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/history"]
+[tool.uv.build-backend]
+module-name = "history"
 
 [tool.ruff.lint]
 extend-select = ["I"]

@@ -1,14 +1,13 @@
-import re
+import importlib.metadata
 
 from django.conf import settings
 
 from .backends import get_backend, session  # noqa
 from .utils import get_history_model  # noqa
 
-__version__ = "3.6.0"
+__version__ = importlib.metadata.version("django-history-triggers")
 __version_info__ = tuple(
-    int(num) if num.isdigit() else num
-    for num in re.findall(r"([a-z\d]+)", __version__, re.I)
+    int(num) if num.isdigit() else num for num in __version__.split(".")
 )
 
 
