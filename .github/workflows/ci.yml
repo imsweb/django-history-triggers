@@ -15,7 +15,7 @@ jobs:
       - uses: astral-sh/ruff-action@v3
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     services:
       postgres:
         image: postgres

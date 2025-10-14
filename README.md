@@ -6,9 +6,12 @@ that automatically record inserts, updates, and deletes to model tables.
 
 ## Requirements
 
-* Django 3.2+
+* Django 4.2+
 * PostgreSQL or SQLite database
 
+*Warning: there is a [bug](https://sqlite.org/forum/forumpost/ecb94cd210) in SQLite
+3.45.1 that causes JSON changes to be stored as strings. Unfortunately, this is the
+version that ships with Ubuntu 24.04.*
 
 ## Installation
 
