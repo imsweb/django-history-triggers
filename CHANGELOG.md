@@ -2,6 +2,7 @@
 
 * Switched to [uv](https://docs.astral.sh/uv/) for development
 * Ensure backend cache is thread-safe (#11)
+* Test on Django 6.0
 
 
 ## 3.5.0

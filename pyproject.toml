@@ -1,6 +1,6 @@
 [project]
 name = "django-history-triggers"
-version = "3.7.0"
+version = "3.6.0"
 authors = [
     {name = "Dan Watson", email = "watsond@imsweb.com"},
 ]
