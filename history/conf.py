@@ -6,6 +6,7 @@ USER_FIELD = getattr(settings, "HISTORY_USER_FIELD", "user_id")
 USER_TYPE = getattr(settings, "HISTORY_USER_TYPE", "integer")
 DEFAULT_USER = getattr(settings, "HISTORY_DEFAULT_USER", 0)
 DEFAULT_USER_ERROR = getattr(settings, "HISTORY_DEFAULT_USER_ERROR", False)
+TRUNCATE_HASH = getattr(settings, "HISTORY_TRUNCATE_HASH", "md5")
 
 # The database role that should own the history tables and triggers.
 DB_ROLE = getattr(settings, "HISTORY_DB_ROLE", settings.DATABASES["default"]["USER"])

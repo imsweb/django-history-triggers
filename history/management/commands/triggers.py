@@ -12,7 +12,7 @@ def truncate_long_name(name):
     # 63 characters. Originally found in django/db/backends/utils.py in "truncate_name"
     # Django source code:
     # https://github.com/django/django/blob/stable/1.5.x/django/db/backends/util.py#L133
-    hsh = hashlib.md5(force_bytes(name)).hexdigest()[:5]
+    hsh = getattr(hashlib, conf.TRUNCATE_HASH)(force_bytes(name)).hexdigest()[:5]
     return "%s_%s" % (name[:57], hsh) if len(name) > 63 else name
 
 
