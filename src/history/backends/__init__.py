@@ -17,7 +17,7 @@ def get_backend(alias=DEFAULT_DB_ALIAS, cls=None, cache=True):
             from .postgres import PostgresHistoryBackend
 
             backend = PostgresHistoryBackend(alias)
-        elif engine == "sqlite3":
+        elif engine in ("sqlite3", "spatialite"):
             from .sqlite import SQLiteHistoryBackend
 
             backend = SQLiteHistoryBackend(alias)
